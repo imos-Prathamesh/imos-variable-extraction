@@ -185,11 +185,14 @@ def cmd_test_parser() -> None:
         sys.exit(1)
 
 
-def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None) -> None:
+def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _result=None) -> None:
     _header(f"Extract: {article}")
-    from traversal import extract_article
 
-    result = extract_article(article)
+    if _result is not None:
+        result = _result
+    else:
+        from traversal import extract_article
+        result = extract_article(article)
 
     print(f"\n{BOLD}Unique Variables ({len(result.unique_vars)}){RESET}")
     rows = sorted(result.unique_vars.items())
@@ -269,6 +272,8 @@ def main() -> None:
                     help="List first N article names from the DB")
     ap.add_argument("--article", metavar="NAME",
                     help="Extract a single article by NAME")
+    ap.add_argument("--flow", metavar="FLOW", default="anglconi",
+                    help="Workflow to use: anglconi (default) or anglclie")
     ap.add_argument("--all", action="store_true",
                     help="Extract all articles")
     ap.add_argument("--occurrences", action="store_true",
@@ -293,7 +298,15 @@ def main() -> None:
         return
 
     if args.article:
-        cmd_extract(args.article, args.occurrences, args.csv)
+        if args.flow == "anglclie":
+            from traversal_anglclie import extract_anglclie
+            _header(f"Extract (anglclie): {args.article}")
+            from traversal import ExtractionResult
+            result = extract_anglclie(args.article)
+            cmd_extract(args.article, args.occurrences, args.csv,
+                        _result=result)
+        else:
+            cmd_extract(args.article, args.occurrences, args.csv)
         return
 
     if args.all:
