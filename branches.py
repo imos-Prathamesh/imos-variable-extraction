@@ -200,6 +200,8 @@ BRANCHES: dict[str, Branch] = {
             "SECTNAME", "CONT", "GROOVE", "GAP",
             "ARTIKELNR", "RENDER", "INFOFOLDER",
             "SCFACTOR", "SLWEIGHT", "SAUFMASS",
+            "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN",
+            "TEXT", "TEXT2", "MAT", "SURF", "MATOR", "SURFOR",
         ],
         next_state=STATE_EXTRUCON,
         order_columns=["CHILDNUM"],

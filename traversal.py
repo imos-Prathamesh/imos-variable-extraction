@@ -219,7 +219,7 @@ class Traversal:
 
         conn_rows = query(
             "SELECT * FROM dbo.[CONNECTIONS] "
-            "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL "
+            "WHERE NAME = ? "
             "ORDER BY CONNUM",
             (value,)
         )
@@ -232,16 +232,21 @@ class Traversal:
 
     def _process_connections_row(self, row: dict, path: list[str]) -> None:
         name = normalize(row.get("NAME"))
+        conndirect = normalize(row.get("CONNDIRECT"))
 
-        # CONNSELTREE
-        self._branch_lookup(
-            name, STATE_CONNSELTREE, path,
-            lambda child_rows: [
-                (normalize(r["CHILDID"]), r)
-                for r in child_rows
-                if normalize(r.get("CHILDID"))
-            ],
-        )
+        # CONNSELTREE — matched via CONNDIRECT
+        if conndirect:
+            cst_rows = query(
+                "SELECT CHILDID FROM dbo.[CONNSELTREE] "
+                "WHERE NAME = ? "
+                "ORDER BY COMPONENT, PARENTNUM, CHILDNUM, POSNUM",
+                (conndirect,)
+            )
+            for r in cst_rows:
+                child = normalize(r.get("CHILDID"))
+                if child:
+                    child_path = path + [f"CONNDIRECT={conndirect} → CONNSELTREE.CHILDID={child}"]
+                    self._resolve_then_branch(child, child_path)
 
         # CONNDESC
         self._generic_branch(name, STATE_CONNDESC, path)
@@ -252,11 +257,13 @@ class Traversal:
         # CONNGROUPS → WORKGROUP
         self._conngroups_to_workgroup(name, path)
 
-        # Groove → nut_erb
+        # Groove → nut_erb + extrupar (7 branches) + extrucon (3 branches)
         groove = normalize(row.get("GROOVE"))
         if groove:
             groove_path = path + [f"GROOVE={groove}"]
             self._generic_branch(groove, STATE_NUT_ERB, groove_path)
+            self._extrupar_branch(groove, groove_path)
+            self._extrucon_branch(groove, groove_path)
 
         # LINDIV / LINDIV2 / ROTATION / POSPART0VAR / SNAPRADI / VARIANT
         for col in ("LINDIV", "LINDIV2", "ROTATION", "POSPART0VAR", "SNAPRADI", "VARIANT"):
@@ -265,8 +272,75 @@ class Traversal:
                 sub_path = path + [f"{col}={val}"]
                 self._classify(val, STATE_CONNECTIONS, sub_path, "CONNECTIONS", col)
 
-        # extrupar branch
-        self._generic_branch(name, STATE_EXTRUPAR, path)
+        # extrupar + extrucon
+        self._extrupar_branch(name, path)
+        self._extrucon_branch(name, path)
+
+        # ident
+        self._generic_branch(name, STATE_IDENT, path)
+
+    # ── RENDER_PRZ resolver ───────────────────────────────────────────────────
+
+    def _resolve_then_render(self, value: str, path: list[str]) -> None:
+        """Resolve $ via IMOS; pass raw result to RENDER branch."""
+        pv = parse(value)
+        if pv is None:
+            return
+        for varname in pv.variables:
+            state_key = (STATE_IMOS, varname)
+            if state_key in self._active:
+                self.result.cycles.append(
+                    f"CYCLE: {' → '.join(path)} → $IMOS({varname})"
+                )
+                continue
+            self._active.add(state_key)
+            wert_values = _fetch_imos(varname)
+            if not wert_values:
+                self._record(varname, "[NOT IN IMOS]",
+                             path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
+            for wert in wert_values:
+                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                self._resolve_then_render(wert, rec_path)
+            self._active.discard(state_key)
+        if pv.is_raw:
+            self._generic_branch(value, STATE_RENDER, path)
+
+    # ── CONNSELTREE resolved-value direct branch ──────────────────────────────
+
+    def _resolve_then_branch(self, value: str, path: list[str]) -> None:
+        """Resolve $ via IMOS recursively; route raw result directly to sub-branches."""
+        pv = parse(value)
+        if pv is None:
+            return
+        for varname in pv.variables:
+            state_key = (STATE_IMOS, varname)
+            if state_key in self._active:
+                self.result.cycles.append(
+                    f"CYCLE: {' → '.join(path)} → $IMOS({varname})"
+                )
+                continue
+            self._active.add(state_key)
+            wert_values = _fetch_imos(varname)
+            if not wert_values:
+                self._record(varname, "[NOT IN IMOS]",
+                             path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
+            for wert in wert_values:
+                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                self._resolve_then_branch(wert, rec_path)
+            self._active.discard(state_key)
+        if pv.is_raw:
+            self._direct_sub_branches(value, path)
+
+    def _direct_sub_branches(self, name: str, path: list[str]) -> None:
+        """Query all sub-branches directly for a resolved name (bypasses CONNECTIONS lookup)."""
+        self._generic_branch(name, STATE_CONNDESC, path)
+        self._generic_branch(name, STATE_CONNEXTRA, path)
+        self._conngroups_to_workgroup(name, path)
+        self._extrupar_branch(name, path)
+        self._extrucon_branch(name, path)
+        self._generic_branch(name, STATE_IDENT, path)
 
     # ── generic branch helper ─────────────────────────────────────────────────
 
@@ -297,6 +371,55 @@ class Traversal:
             sub_path = path + [f"{branch.label}={val}"]
             self._classify(val, branch.next_state, sub_path,
                            branch.match_table, branch.value_columns[0])
+
+    # ── extrupar branch (per-column routing) ─────────────────────────────────
+
+    def _extrupar_branch(self, name: str | None, path: list[str]) -> None:
+        if not name:
+            return
+        branch = BRANCHES[STATE_EXTRUPAR]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            groove = normalize(row.get("GROOVE"))
+            if groove:
+                self._generic_branch(groove, STATE_NUT_ERB,
+                                     path + [f"extrupar.GROOVE={groove}"])
+            render = normalize(row.get("RENDER"))
+            if render:
+                self._generic_branch(render, STATE_RENDER,
+                                     path + [f"extrupar.RENDER={render}"])
+            cont = normalize(row.get("CONT"))
+            if cont:
+                self._generic_branch(cont, STATE_CONTELEM,
+                                     path + [f"extrupar.CONT={cont}"])
+            # SECTNAME → contelem.CNAME
+            sectname = normalize(row.get("SECTNAME"))
+            if sectname:
+                self._generic_branch(sectname, STATE_CONTELEM,
+                                     path + [f"extrupar.SECTNAME={sectname}"])
+
+            for col in ("GAP", "ARTIKELNR", "INFOFOLDER",
+                        "SCFACTOR", "SLWEIGHT", "SAUFMASS",
+                        "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN",
+                        "TEXT", "TEXT2", "MAT", "SURF", "MATOR", "SURFOR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS,
+                                   path + [f"extrupar.{col}={val}"],
+                                   "extrupar", col)
+
+    def _extrucon_branch(self, name: str | None, path: list[str]) -> None:
+        if not name:
+            return
+        branch = BRANCHES[STATE_EXTRUCON]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in branch.value_columns:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS,
+                                   path + [f"extrucon.{col}={val}"],
+                                   "extrucon", col)
 
     # ── CONNGROUPS → WORKGROUP ────────────────────────────────────────────────
 
@@ -334,8 +457,11 @@ class Traversal:
     def _profil_branch(self, name: str, path: list[str]) -> None:
         branch = BRANCHES[STATE_PROFIL]
         rows = _fetch_branch(branch, name)
+        _skip = {"PRFDESCR", "RENDER_PRZ"}
         for row in rows:
             for col in branch.value_columns:
+                if col in _skip:
+                    continue
                 val = normalize(row.get(col))
                 if val:
                     sub_path = path + [f"PROFIL.{col}={val}"]
@@ -348,8 +474,8 @@ class Traversal:
 
             render_prz = normalize(row.get("RENDER_PRZ"))
             if render_prz:
-                self._generic_branch(render_prz, STATE_RENDER,
-                                     path + [f"PROFIL.RENDER_PRZ={render_prz}"])
+                self._resolve_then_render(render_prz,
+                                          path + [f"PROFIL.RENDER_PRZ={render_prz}"])
 
     # ── record helper ─────────────────────────────────────────────────────────
 
