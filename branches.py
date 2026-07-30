@@ -1,6 +1,5 @@
 """
 Typed branch definitions.
-
 Each Branch describes exactly one table in the flow:
   match_table    – the table to query
   match_column   – the column that must equal the incoming value
