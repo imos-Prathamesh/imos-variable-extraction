@@ -1,6 +1,5 @@
 """
 SQL Server connection layer.
-
 Reads credentials from environment variables OR from a .env file in the
 project root (for local runs).
 
