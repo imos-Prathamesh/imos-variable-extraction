@@ -1,0 +1,64 @@
+Two cases:
+
+Case 1 — Same anglconi table, different column as entry
+
+Create traversal_anglconi2.py:
+
+"""anglconi flow variant: uses ELEMID instead of CONISITU"""
+from __future__ import annotations
+from db import query, normalize
+from traversal_base import BaseTraversal, ExtractionResult
+from traversal_mixins import ConnectionTreeMixin
+from branches import STATE_CONISITU
+class TraversalAnglconi2(ConnectionTreeMixin, BaseTraversal):
+    def run(self) -> ExtractionResult:
+        rows = query(
+            "SELECT ac.ELEMID "
+            "FROM dbo.articles a "
+            "JOIN dbo.anglconi ac "
+            "  ON ac.NAME = a.NAME COLLATE Latin1_General_CI_AS "
+            "WHERE a.NAME = ? "
+            "  AND NULLIF(LTRIM(RTRIM(ac.INORDER)), N'') IS NULL "
+            "ORDER BY ac.SEQUENCENUM, ac.ELEMID",
+            (self.article,)
+        )
+        for row in rows:
+            val = normalize(row["ELEMID"])
+            if val:
+                path = [f"anglconi2({self.article})", f"ELEMID={val}"]
+                self._classify(val, STATE_CONISITU, path, "anglconi", "ELEMID")
+        return self.result
+def extract_anglconi2(article: str, max_depth: int = 40) -> ExtractionResult:
+    return TraversalAnglconi2(article, max_depth).run()
+
+Case 2 — Same anglconi table, different filter/join condition
+
+Just change the SQL WHERE clause in run(). Everything else stays identical.
+
+Register in main.py:
+
+File: main.py
+
+Find
+
+        elif args.flow == "profiles":
+            from traversal_profiles import extract_profiles
+            result = extract_profiles(args.article)
+            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
+        else:
+
+Replace
+
+        elif args.flow == "profiles":
+            from traversal_profiles import extract_profiles
+            result = extract_profiles(args.article)
+            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
+        elif args.flow == "anglconi2":
+            from traversal_anglconi2 import extract_anglconi2
+            result = extract_anglconi2(args.article)
+            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
+        else:
+
+Test:
+
+python main.py --article "ARTICLE_NAME" --flow anglconi2

@@ -1,0 +1,23 @@
+How to Test
+No DB needed:
+
+python main.py --test-parser
+
+DB connection check:
+
+python main.py --test-connection
+
+List articles:
+
+python main.py --list-articles 20
+
+Test with article (anglconi flow):
+
+python main.py --article "ARTICLE_NAME"
+python main.py --article "ARTICLE_NAME" --occurrences
+python main.py --article "ARTICLE_NAME" --csv out.csv
+
+Test with article (anglclie flow):
+
+python main.py --article "ARTICLE_NAME" --flow anglclie
+

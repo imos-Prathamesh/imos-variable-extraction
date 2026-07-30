@@ -191,7 +191,7 @@ def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _res
     if _result is not None:
         result = _result
     else:
-        from traversal import extract_article
+        from traversal_anglconi import extract_article
         result = extract_article(article)
 
     print(f"\n{BOLD}Unique Variables ({len(result.unique_vars)}){RESET}")
@@ -232,7 +232,7 @@ def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _res
 
 def cmd_extract_all(csv_path: str | None) -> None:
     _header("Extract All Articles")
-    from traversal import extract_all_articles
+    from traversal_anglconi import extract_all_articles
 
     results = extract_all_articles()
     total_occ = sum(len(r.occurrences) for r in results)
@@ -301,7 +301,7 @@ def main() -> None:
         if args.flow == "anglclie":
             from traversal_anglclie import extract_anglclie
             _header(f"Extract (anglclie): {args.article}")
-            from traversal import ExtractionResult
+            from traversal_base import ExtractionResult
             result = extract_anglclie(args.article)
             cmd_extract(args.article, args.occurrences, args.csv,
                         _result=result)
