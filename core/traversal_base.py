@@ -1,3 +1,5 @@
+# Source : core/traversal_base.py
+# Analogy: Car engine — the core recursive logic (IMOS lookup, descriptor lookup, cycle detection) that powers every flow. Never runs alone.
 """
 Shared base for all IMOS traversal flows.
 Each flow subclasses BaseTraversal and implements only run().
@@ -6,9 +8,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from db import query, normalize
-from parser import parse
-from branches import (
+from core.db import query, normalize
+from core.parser import parse
+from core.branches import (
     BRANCHES,
     STATE_CONISITU, STATE_CONNECTIONS,
     STATE_CONNSELTREE, STATE_CONNDESC, STATE_CONNEXTRA,

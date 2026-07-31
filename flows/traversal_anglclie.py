@@ -1,9 +1,11 @@
+# Source : flows/traversal_anglclie.py
+# Analogy: Flow 2 entry point — starts from anglclie.TAGVALUE, runs IMOS-only loop with no connection tree.
 """anglclie flow: articles.NAME → anglclie.TAGVALUE → IMOS loop"""
 from __future__ import annotations
 
-from db import query, normalize
-from traversal_base import BaseTraversal, ExtractionResult
-from traversal_mixins import ImosMixin
+from core.db import query, normalize
+from core.traversal_base import BaseTraversal, ExtractionResult
+from flows.traversal_mixins import ImosMixin
 
 
 class TraversalAnglclie(ImosMixin, BaseTraversal):

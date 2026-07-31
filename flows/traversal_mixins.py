@@ -1,18 +1,20 @@
+# Source : flows/traversal_mixins.py
+# Analogy: Plug-in attachments — ConnectionTreeMixin for full connection tree walk, ImosMixin for IMOS-only loop. Pick only what your flow needs.
 """
 Reusable traversal patterns shared across flows.
 Pick only the mixins your flow needs.
 """
 from __future__ import annotations
 
-from db import query, normalize
-from branches import (
+from core.db import query, normalize
+from core.branches import (
     BRANCHES,
     STATE_CONNECTIONS, STATE_CONNDESC, STATE_CONNEXTRA,
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_IMOS,
 )
-from parser import parse
+from core.parser import parse
 
 
 class ConnectionTreeMixin:
@@ -72,7 +74,7 @@ class ConnectionTreeMixin:
                 self.result.cycles.append(f"CYCLE: {' → '.join(path)} → $IMOS({varname})")
                 continue
             self._active.add(state_key)
-            from traversal_base import _fetch_imos
+            from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
             if not wert_values:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
@@ -94,7 +96,7 @@ class ConnectionTreeMixin:
                 self.result.cycles.append(f"CYCLE: {' → '.join(path)} → $IMOS({varname})")
                 continue
             self._active.add(state_key)
-            from traversal_base import _fetch_imos
+            from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
             if not wert_values:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
@@ -117,7 +119,7 @@ class ConnectionTreeMixin:
     def _generic_branch(self, name, state_key, path):
         if not name:
             return
-        from traversal_base import _fetch_branch
+        from core.traversal_base import _fetch_branch
         branch = BRANCHES.get(state_key)
         if branch is None:
             return
@@ -132,7 +134,7 @@ class ConnectionTreeMixin:
     def _extrupar_branch(self, name, path):
         if not name:
             return
-        from traversal_base import _fetch_branch
+        from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_EXTRUPAR]
         rows = _fetch_branch(branch, name)
         for row in rows:
@@ -158,7 +160,7 @@ class ConnectionTreeMixin:
     def _extrucon_branch(self, name, path):
         if not name:
             return
-        from traversal_base import _fetch_branch
+        from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_EXTRUCON]
         rows = _fetch_branch(branch, name)
         for row in rows:
@@ -170,7 +172,7 @@ class ConnectionTreeMixin:
     def _conngroups_to_workgroup(self, name, path):
         if not name:
             return
-        from traversal_base import _fetch_branch
+        from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_CONNGROUPS]
         rows = _fetch_branch(branch, name)
         for row in rows:
@@ -191,7 +193,7 @@ class ConnectionTreeMixin:
                     self._generic_branch(contour, STATE_CONTELEM, grp_path + [f"WORKGROUP.CONTOUR={contour}"])
 
     def _profil_branch(self, name, path):
-        from traversal_base import _fetch_branch
+        from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_PROFIL]
         rows = _fetch_branch(branch, name)
         _skip = {"PRFDESCR", "RENDER_PRZ"}
@@ -214,8 +216,8 @@ class ImosMixin:
     """IMOS-only loop — no connection tree. Used by anglclie-style flows."""
 
     def _classify_imos_loop(self, value, path):
-        from traversal_base import _fetch_imos, _fetch_descriptor
-        from branches import STATE_IMOS, STATE_DESCRIPTOR
+        from core.traversal_base import _fetch_imos, _fetch_descriptor
+        from core.branches import STATE_IMOS, STATE_DESCRIPTOR
         if len(path) > self.max_depth:
             return
         pv = parse(value)

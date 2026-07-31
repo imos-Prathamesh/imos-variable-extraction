@@ -1,3 +1,5 @@
+# Source : core/branches.py
+# Analogy: Menu of database tables — lists every table to check, which columns to read, and where to go next.
 """
 Typed branch definitions.
 Each Branch describes exactly one table in the flow:

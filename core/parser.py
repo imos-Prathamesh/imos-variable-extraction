@@ -1,3 +1,5 @@
+# Source : core/parser.py
+# Analogy: Metal detector — scans any text value and spots $ variables and # descriptors hidden inside it.
 """
 $variable and #descriptor token parser.
 

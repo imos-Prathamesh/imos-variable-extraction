@@ -1,10 +1,12 @@
+# Source : flows/traversal_anglconi.py
+# Analogy: Flow 1 entry point — starts from anglconi.CONISITU, walks the full connection tree with IMOS and DESCRIPTOR resolution.
 """anglconi flow: articles.NAME → anglconi.CONISITU → IMOS/DESCRIPTOR/CONNECTIONS"""
 from __future__ import annotations
 
-from db import query, normalize
-from traversal_base import BaseTraversal, ExtractionResult
-from traversal_mixins import ConnectionTreeMixin
-from branches import STATE_CONISITU
+from core.db import query, normalize
+from core.traversal_base import BaseTraversal, ExtractionResult
+from flows.traversal_mixins import ConnectionTreeMixin
+from core.branches import STATE_CONISITU
 
 
 class TraversalAnglconi(ConnectionTreeMixin, BaseTraversal):
@@ -34,7 +36,7 @@ def extract_article(article: str, max_depth: int = 40) -> ExtractionResult:
 
 
 def extract_all_articles(max_depth: int = 40) -> list[ExtractionResult]:
-    from db import query as _query
+    from core.db import query as _query
     rows = _query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
     results = []
     for row in rows:

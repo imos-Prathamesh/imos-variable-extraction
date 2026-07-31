@@ -1,3 +1,5 @@
+# Source : core/db.py
+# Analogy: Phone line to SQL Server — every file uses this to talk to the database. Touch only when credentials or driver changes.
 """
 SQL Server connection layer.
 Reads credentials from environment variables OR from a .env file in the
@@ -23,7 +25,7 @@ from typing import Any
 try:
     from dotenv import load_dotenv
 
-    _env_file = Path(__file__).parent / ".env"
+    _env_file = Path(__file__).parent.parent / ".env"
     if _env_file.exists():
         load_dotenv(_env_file)
         print(f"  [db] Loaded .env from {_env_file}")
