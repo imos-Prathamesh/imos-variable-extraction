@@ -21,16 +21,20 @@ import os
 from pathlib import Path
 from typing import Any
 
-# Load .env file if present (local dev convenience)
-try:
-    from dotenv import load_dotenv
-
-    _env_file = Path(__file__).parent.parent / ".env"
-    if _env_file.exists():
-        load_dotenv(_env_file)
-        print(f"  [db] Loaded .env from {_env_file}")
-except ImportError:
-    pass
+# Load config.json written by UI settings panel
+_cfg_file = Path(__file__).parent.parent / "config.json"
+if _cfg_file.exists():
+    try:
+        import json as _json
+        _cfg = _json.loads(_cfg_file.read_text())
+        for _k, _env in (("server",   "MSSQL_SERVER"),
+                         ("database", "MSSQL_DATABASE"),
+                         ("user",     "MSSQL_USER"),
+                         ("password", "MSSQL_PASSWORD")):
+            if _cfg.get(_k) and not os.environ.get(_env):
+                os.environ[_env] = _cfg[_k]
+    except Exception:
+        pass
 
 _conn = None
 
