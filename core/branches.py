@@ -33,6 +33,8 @@ STATE_EXTRUCON        = "EXTRUCON"
 STATE_IDENT           = "IDENT"
 STATE_DESCRIPTOR      = "DESCRIPTOR"
 STATE_IMOS            = "IMOS"
+STATE_MAT             = "MAT"
+STATE_SURF            = "SURF"
 STATE_TERMINAL        = "TERMINAL"
 
 
@@ -60,7 +62,7 @@ BRANCHES: dict[str, Branch] = {
         filter_column="INORDER",
         value_columns=[
             "CONNDIRECT", "LINDIV", "LINDIV2", "ROTATION",
-            "GROOVE", "POSPART0VAR", "SNAPRADI", "VARIANT",
+            "GROOVE", "POSPART0VAR", "POSPART1VAR", "SNAPRADI", "VARIANT",
         ],
         next_state=STATE_CONNECTIONS,
         order_columns=["CONNUM"],
@@ -188,8 +190,35 @@ BRANCHES: dict[str, Branch] = {
             "SWGTYPE", "SMACHCLASS",
             "SGAP_X_LEFT", "SGAP_X_RIGHT",
             "MERGE_GROOVES_RADIUS",
+            "PRFNAMEBO", "PRFNAMESE",
         ],
         next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_MAT: Branch(
+        label="MAT",
+        match_table="MAT",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=[
+            "RENDER_PRZ", "STHK", "STHK_ORD", "SCFACTOR",
+            "SCOST", "SDWEIGHT", "OVERSIZEX", "OVERSIZEY",
+        ],
+        next_state=STATE_CONNECTIONS,
+        order_columns=[],
+    ),
+
+    STATE_SURF: Branch(
+        label="SURF",
+        match_table="SURF",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=[
+            "RENDER_PRZ", "OVERSIZEX", "OVERSIZEY", "SCFACTOR",
+            "SCOST", "STHK", "STHK_ORD", "VPART_MAT",
+        ],
+        next_state=STATE_CONNECTIONS,
         order_columns=[],
     ),
 

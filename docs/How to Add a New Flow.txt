@@ -1,64 +1,136 @@
-Two cases:
+How to Add a New Flow — IMOS Variable Extractor
+════════════════════════════════════════════════
 
-Case 1 — Same anglconi table, different column as entry
+This project uses a FLOW REGISTRY (core/flow_registry.py) that
+auto-discovers every flow module inside flows/. You do NOT need to
+edit main.py or ui/main_window.py to add a new flow — just follow
+the contract below and it appears automatically in:
 
-Create traversal_anglconi2.py:
+  - CLI:  --flow <your_flow_name>
+  - CLI:  --article "X"  (runs it as part of "all flows")
+  - CLI:  --all          (if extract_all is defined)
+  - UI:   Workflow dropdown on the Run tab
 
-"""anglconi flow variant: uses ELEMID instead of CONISITU"""
-from __future__ import annotations
-from db import query, normalize
-from traversal_base import BaseTraversal, ExtractionResult
-from traversal_mixins import ConnectionTreeMixin
-from branches import STATE_CONISITU
-class TraversalAnglconi2(ConnectionTreeMixin, BaseTraversal):
-    def run(self) -> ExtractionResult:
-        rows = query(
-            "SELECT ac.ELEMID "
-            "FROM dbo.articles a "
-            "JOIN dbo.anglconi ac "
-            "  ON ac.NAME = a.NAME COLLATE Latin1_General_CI_AS "
-            "WHERE a.NAME = ? "
-            "  AND NULLIF(LTRIM(RTRIM(ac.INORDER)), N'') IS NULL "
-            "ORDER BY ac.SEQUENCENUM, ac.ELEMID",
-            (self.article,)
-        )
+
+THE CONTRACT
+────────────
+Every flow module in flows/ must expose, at module level:
+
+    FLOW_NAME : str                       # unique name, used everywhere
+    def extract(article: str, max_depth: int = 40) -> ExtractionResult
+
+Optional:
+
+    def extract_all(max_depth: int = 40) -> list[ExtractionResult]
+        # only needed if you want this flow included in --all / "All Articles"
+
+A module WITHOUT FLOW_NAME is silently skipped by the registry — this
+is how flows/traversal_myflow.py stays a safe, unused template.
+
+Duplicate FLOW_NAME across two modules raises an error at startup —
+pick a unique name.
+
+
+STEP-BY-STEP: SIMPLEST CASE (new source table, existing IMOS/DESCRIPTOR pattern)
+──────────────────────────────────────────────────────────────────────────────────
+1. Copy flows/traversal_myflow.py to flows/traversal_<yourflow>.py
+
+2. Edit the class:
+   - Change the SQL query to point at your table/column
+   - Change STATE_CONISITU to the right entry state from core/branches.py
+     (or add a new STATE_XXX + Branch entry in core/branches.py first —
+     see README_PROJECT.md section 3)
+   - Pick the right mixin: ConnectionTreeMixin (full connection tree walk)
+     or ImosMixin (IMOS-only loop, no connection tree) — see
+     flows/traversal_mixins.py for what each provides
+
+3. Add these two lines at the bottom of the file:
+
+    FLOW_NAME = "<yourflow>"
+    extract = extract_<yourflow>       # must match your function name
+
+4. (Optional) If you want it included in --all, add:
+
+    def extract_all_<yourflow>(max_depth: int = 40) -> list[ExtractionResult]:
+        from core.db import query as _query
+        rows = _query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
+        results = []
         for row in rows:
-            val = normalize(row["ELEMID"])
-            if val:
-                path = [f"anglconi2({self.article})", f"ELEMID={val}"]
-                self._classify(val, STATE_CONISITU, path, "anglconi", "ELEMID")
-        return self.result
-def extract_anglconi2(article: str, max_depth: int = 40) -> ExtractionResult:
-    return TraversalAnglconi2(article, max_depth).run()
+            name = normalize(row["NAME"])
+            if name:
+                results.append(extract_<yourflow>(name, max_depth))
+        return results
 
-Case 2 — Same anglconi table, different filter/join condition
+    extract_all = extract_all_<yourflow>
 
-Just change the SQL WHERE clause in run(). Everything else stays identical.
+5. Test immediately from CLI — no other file needs editing:
 
-Register in main.py:
+    python main.py --article "X" --flow <yourflow>
 
-File: main.py
+   If it appears without an "Unknown flow" error, it registered
+   correctly.
 
-Find
+6. (Optional) Open the UI (python main.py) and click "↻ Refresh Flow
+   List" on the Run tab — your new flow now shows in the dropdown.
 
-        elif args.flow == "profiles":
-            from traversal_profiles import extract_profiles
-            result = extract_profiles(args.article)
-            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
-        else:
 
-Replace
+EXAMPLE — Case 1: Same table, different entry column
+──────────────────────────────────────────────────────
+Create flows/traversal_anglconi2.py:
 
-        elif args.flow == "profiles":
-            from traversal_profiles import extract_profiles
-            result = extract_profiles(args.article)
-            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
-        elif args.flow == "anglconi2":
-            from traversal_anglconi2 import extract_anglconi2
-            result = extract_anglconi2(args.article)
-            cmd_extract(args.article, args.occurrences, args.csv, _result=result)
-        else:
+    """anglconi flow variant: uses ELEMID instead of CONISITU"""
+    from __future__ import annotations
+    from core.db import query, normalize
+    from core.traversal_base import BaseTraversal, ExtractionResult
+    from flows.traversal_mixins import ConnectionTreeMixin
+    from core.branches import STATE_CONISITU
+
+    class TraversalAnglconi2(ConnectionTreeMixin, BaseTraversal):
+        def run(self) -> ExtractionResult:
+            rows = query(
+                "SELECT ac.ELEMID "
+                "FROM dbo.articles a "
+                "JOIN dbo.anglconi ac "
+                "  ON ac.NAME = a.NAME COLLATE Latin1_General_CI_AS "
+                "WHERE a.NAME = ? "
+                "  AND NULLIF(LTRIM(RTRIM(ac.INORDER)), N'') IS NULL "
+                "ORDER BY ac.SEQUENCENUM, ac.ELEMID",
+                (self.article,)
+            )
+            for row in rows:
+                val = normalize(row["ELEMID"])
+                if val:
+                    path = [f"anglconi2({self.article})", f"ELEMID={val}"]
+                    self._classify(val, STATE_CONISITU, path, "anglconi", "ELEMID")
+            return self.result
+
+    def extract_anglconi2(article: str, max_depth: int = 40) -> ExtractionResult:
+        return TraversalAnglconi2(article, max_depth).run()
+
+    FLOW_NAME = "anglconi2"
+    extract = extract_anglconi2
 
 Test:
+    python main.py --article "ARTICLE_NAME" --flow anglconi2
 
-python main.py --article "ARTICLE_NAME" --flow anglconi2
+
+EXAMPLE — Case 2: Same table, different filter/join condition
+──────────────────────────────────────────────────────────────
+Just change the SQL WHERE clause in run(). Everything else (mixin,
+FLOW_NAME, extract assignment) stays identical to Case 1.
+
+
+IMPORTANT NOTES
+────────────────
+- Never edit main.py or ui/main_window.py to register a flow — if
+  you find yourself doing that, something is wrong; the registry
+  is meant to make that unnecessary.
+- flows/traversal_myflow.py has NO FLOW_NAME on purpose — keep it
+  that way; it's the copy-paste starting template only.
+- If a flow file has a Python import error, the registry prints a
+  one-line warning at startup (e.g. "[flow_registry] skipped
+  flows.traversal_x: <error>") and continues without it — fix the
+  import and it will register on next run.
+- To force the registry to re-scan flows/ without restarting the
+  process (e.g. from a running UI), call core.flow_registry.reset_registry().
+  The UI's "↻ Refresh Flow List" button already does this for you.

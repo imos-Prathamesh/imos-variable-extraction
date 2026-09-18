@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 # Source : main.py (project root)
-# Analogy: Control panel — the only file you run from terminal. Wires all flows together and handles all commands.
+# Analogy: Control panel — routes to CLI commands or launches the NiceGUI window.
+# Flows are no longer hardcoded here — they come from core/flow_registry.py.
+# Add a new flows/traversal_xxx.py with FLOW_NAME + extract() and it appears
+# automatically in --flow choices, --article (all flows), --all, and the UI.
 """
 IMOS Variable Extractor — CLI entry point
 
-Flows available
-───────────────
-  anglconi  →  articles → anglconi.CONISITU → IMOS / DESCRIPTOR / CONNECTIONS (full tree)
-  anglclie  →  articles → anglclie.TAGVALUE → IMOS loop only
-  anglgrtx  →  articles → anglgrtx.TEXT     → IMOS loop only
-
 Usage
 ─────
+  # No arguments — launches the NiceGUI web window
+  python main.py
+
   # Parser self-test (no DB needed — run this first)
   python main.py --test-parser
 
@@ -21,13 +21,11 @@ Usage
   # List available article names
   python main.py --list-articles 20
 
-  # Extract one article — runs ALL flows, shows which flow found what
+  # Extract one article — runs ALL registered flows
   python main.py --article "MY_ARTICLE"
 
   # Extract one article — specific flow only
   python main.py --article "MY_ARTICLE" --flow anglconi
-  python main.py --article "MY_ARTICLE" --flow anglclie
-  python main.py --article "MY_ARTICLE" --flow anglgrtx
 
   # Show full occurrence path detail
   python main.py --article "MY_ARTICLE" --occurrences
@@ -35,7 +33,7 @@ Usage
   # Save results to CSV
   python main.py --article "MY_ARTICLE" --csv output/results.csv
 
-  # Extract ALL articles — save to CSV
+  # Extract ALL articles across every flow that supports it — save to CSV
   python main.py --all --csv output/all_results.csv
 """
 from __future__ import annotations
@@ -102,8 +100,8 @@ def _tbl(rows: list[list], headers: list[str]) -> None:
 def cmd_test_connection() -> None:
     _header("Test SQL Server Connection")
     try:
-        from core.db import get_connection, query, normalize
-        conn = get_connection()
+        from core.db import get_connection, query
+        get_connection()
         _ok("Connected to SQL Server")
 
         tables = query(
@@ -134,7 +132,6 @@ def cmd_test_connection() -> None:
         else:
             _ok("All 18 expected tables present")
 
-        # Row counts
         print()
         for tname in sorted(expected & found):
             try:
@@ -152,9 +149,7 @@ def cmd_test_connection() -> None:
 def cmd_list_articles(n: int) -> None:
     _header(f"First {n} Articles")
     from core.db import query
-    rows = query(
-        f"SELECT TOP ({n}) NAME FROM dbo.articles ORDER BY NAME"
-    )
+    rows = query(f"SELECT TOP ({n}) NAME FROM dbo.articles ORDER BY NAME")
     for i, r in enumerate(rows, 1):
         print(f"  {i:4d}. {r['NAME']}")
     print(f"\n  (showing {len(rows)} of up to {n})")
@@ -198,14 +193,11 @@ def cmd_test_parser() -> None:
         sys.exit(1)
 
 
-def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _result=None, flow_label: str = "") -> None:
+def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None,
+                 _result, flow_label: str = "") -> None:
     _header(f"Extract: {article}" + (f"  [flow: {flow_label}]" if flow_label else "  [flow: all]"))
 
-    if _result is not None:
-        result = _result
-    else:
-        from flows.traversal_anglconi import extract_article
-        result = extract_article(article)
+    result = _result
 
     print(f"\n{BOLD}Unique Variables ({len(result.unique_vars)}){RESET}")
     rows = sorted(result.unique_vars.items())
@@ -214,14 +206,8 @@ def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _res
     if show_occurrences or csv_path:
         print(f"\n{BOLD}Occurrences ({len(result.occurrences)}){RESET}")
         occ_rows = [
-            [
-                o.variable_name,
-                o.value,
-                o.source_table,
-                o.source_column,
-                o.resolved_via,
-                o.path_str(),
-            ]
+            [o.variable_name, o.value, o.source_table, o.source_column,
+             o.resolved_via, o.path_str()]
             for o in result.occurrences
         ]
         headers = ["Variable", "Value", "Table", "Column", "Via", "Path"]
@@ -230,10 +216,11 @@ def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _res
 
         if csv_path:
             p = Path(csv_path)
+            p.parent.mkdir(parents=True, exist_ok=True)
             with p.open("w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
                 w.writerow(["Article"] + headers)
-                for orow, data in zip(result.occurrences, occ_rows):
+                for data in occ_rows:
                     w.writerow([article] + data)
             _ok(f"Saved {len(occ_rows)} rows → {p.resolve()}")
 
@@ -244,36 +231,53 @@ def cmd_extract(article: str, show_occurrences: bool, csv_path: str | None, _res
 
 
 def cmd_extract_all(csv_path: str | None) -> None:
-    _header("Extract All Articles")
-    from flows.traversal_anglconi import extract_all_articles
+    _header("Extract All Articles (every flow supporting extract_all)")
+    from core.flow_registry import get_registry
 
-    results = extract_all_articles()
-    total_occ = sum(len(r.occurrences) for r in results)
-    total_vars = sum(len(r.unique_vars) for r in results)
-    print(f"\n  Articles processed : {len(results)}")
-    print(f"  Total occurrences  : {total_occ}")
-    print(f"  Total unique vars  : {total_vars}")
+    registry = get_registry()
+    rows_out: list[list] = []
+    total_occ = 0
+    total_vars = 0
+
+    for flow_name, info in sorted(registry.items()):
+        if info.extract_all is None:
+            _warn(f"Flow '{flow_name}' has no extract_all(); skipped")
+            continue
+        print(f"\n{BOLD}  ▶ Flow: {flow_name}{RESET}")
+        results = info.extract_all()
+        total_occ += sum(len(r.occurrences) for r in results)
+        total_vars += sum(len(r.unique_vars) for r in results)
+        for r in results:
+            for o in r.occurrences:
+                rows_out.append([flow_name, r.article, o.variable_name, o.value,
+                                  o.source_table, o.source_column,
+                                  o.resolved_via, o.path_str()])
+
+    print(f"\n  Total occurrences : {total_occ}")
+    print(f"  Total unique vars : {total_vars}")
 
     if csv_path:
         p = Path(csv_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
         with p.open("w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["Article", "Variable", "Value", "Table", "Column", "Via", "Path"])
-            for r in results:
-                for o in r.occurrences:
-                    w.writerow([
-                        r.article, o.variable_name, o.value,
-                        o.source_table, o.source_column,
-                        o.resolved_via, o.path_str(),
-                    ])
+            w.writerow(["Flow", "Article", "Variable", "Value", "Table", "Column", "Via", "Path"])
+            w.writerows(rows_out)
         _ok(f"Saved → {p.resolve()}")
+
+
+def cmd_launch_ui() -> None:
+    from ui.main_window import launch
+    launch()
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main() -> None:
+    from core.flow_registry import get_registry, flow_names
+
     ap = argparse.ArgumentParser(
-        description="IMOS Anglconi Extractor",
+        description="IMOS Variable Extractor",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -286,9 +290,10 @@ def main() -> None:
     ap.add_argument("--article", metavar="NAME",
                     help="Extract a single article by NAME")
     ap.add_argument("--flow", metavar="FLOW", default=None,
-                    help="Flow to use: anglconi, anglclie, anglgrtx. Omit to run all flows.")
+                    help=f"Flow to use. Available: {', '.join(flow_names()) or '(none registered yet)'}. "
+                         "Omit to run all registered flows.")
     ap.add_argument("--all", action="store_true",
-                    help="Extract all articles")
+                    help="Extract all articles (every flow supporting extract_all)")
     ap.add_argument("--occurrences", action="store_true",
                     help="Print full occurrence table (with --article)")
     ap.add_argument("--csv", metavar="FILE",
@@ -311,21 +316,14 @@ def main() -> None:
         return
 
     if args.article:
-        if args.flow is None:
-            from flows.traversal_anglconi import extract_article
-            from flows.traversal_anglclie import extract_anglclie
-            from flows.traversal_anglgrtx import extract_anglgrtx
-            from core.traversal_base import ExtractionResult
+        registry = get_registry()
 
-            flows_to_run = [
-                ("anglconi", extract_article),
-                ("anglclie", extract_anglclie),
-                ("anglgrtx", extract_anglgrtx),
-            ]
+        if args.flow is None:
+            from core.traversal_base import ExtractionResult
             combined = ExtractionResult(article=args.article)
-            for flow_name, flow_fn in flows_to_run:
+            for flow_name, info in sorted(registry.items()):
                 print(f"\n{BOLD}  ▶ Running flow: {flow_name}{RESET}")
-                flow_result = flow_fn(args.article)
+                flow_result = info.extract(args.article, args.max_depth)
                 if flow_result.unique_vars:
                     for var, val in sorted(flow_result.unique_vars.items()):
                         print(f"    {CYAN}{flow_name}{RESET}  →  {var} = {val}")
@@ -336,28 +334,22 @@ def main() -> None:
                 combined.cycles.extend(flow_result.cycles)
             cmd_extract(args.article, args.occurrences, args.csv,
                         _result=combined, flow_label="")
-        elif args.flow == "anglclie":
-            from flows.traversal_anglclie import extract_anglclie
-            result = extract_anglclie(args.article)
-            cmd_extract(args.article, args.occurrences, args.csv,
-                        _result=result, flow_label="anglclie")
-        elif args.flow == "anglgrtx":
-            from flows.traversal_anglgrtx import extract_anglgrtx
-            result = extract_anglgrtx(args.article)
-            cmd_extract(args.article, args.occurrences, args.csv,
-                        _result=result, flow_label="anglgrtx")
-        elif args.flow == "anglconi":
-            cmd_extract(args.article, args.occurrences, args.csv,
-                        flow_label="anglconi")
         else:
-            _err(f"Unknown flow: {args.flow}")
+            info = registry.get(args.flow)
+            if info is None:
+                _err(f"Unknown flow: {args.flow}. Available: {', '.join(sorted(registry.keys()))}")
+                sys.exit(1)
+            result = info.extract(args.article, args.max_depth)
+            cmd_extract(args.article, args.occurrences, args.csv,
+                        _result=result, flow_label=args.flow)
         return
 
     if args.all:
         cmd_extract_all(args.csv)
         return
 
-    ap.print_help()
+    # No arguments at all — launch the NiceGUI window
+    cmd_launch_ui()
 
 
 if __name__ == "__main__":

@@ -37,6 +37,7 @@ if _cfg_file.exists():
         pass
 
 _conn = None
+_driver = None  # "pymssql" or "pyodbc" — set on successful connect
 
 
 def _get_env(key: str) -> str:
@@ -127,7 +128,7 @@ def _make_pyodbc():
 
 
 def get_connection():
-    global _conn
+    global _conn, _driver
     if _conn is not None:
         try:
             cur = _conn.cursor()
@@ -136,12 +137,14 @@ def get_connection():
             return _conn
         except Exception:
             _conn = None
+            _driver = None
 
     errors = []
     for factory in (_make_pymssql, _make_pyodbc):
         try:
             _conn = factory()
-            print(f"  [db] Connected via {factory.__name__.replace('_make_', '')}")
+            _driver = factory.__name__.replace('_make_', '')
+            print(f"  [db] Connected via {_driver}")
             return _conn
         except Exception as e:
             errors.append(f"  [{factory.__name__.replace('_make_', '')}] {e}")
@@ -154,8 +157,11 @@ def get_connection():
 
 
 def query(sql: str, params: tuple = ()) -> list[dict[str, Any]]:
+    global _driver
     conn = get_connection()
     cur = conn.cursor()
+    if _driver == "pymssql":
+        sql = sql.replace("?", "%s")
     try:
         cur.execute(sql, params)
         cols = [d[0] for d in cur.description]
@@ -169,6 +175,106 @@ def scalar(sql: str, params: tuple = ()) -> Any:
     if not rows:
         return None
     return next(iter(rows[0].values()))
+
+
+def discover_sql_servers(timeout: float = 2.0) -> list[str]:
+    """
+    Broadcast a SQL Server Browser discovery request (UDP port 1434) on
+    the local network and parse responses into 'HOST\\INSTANCE' or
+    'HOST' strings. Same mechanism SSMS uses for its server dropdown.
+    """
+    import socket
+
+    found: dict[str, str] = {}
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.settimeout(timeout)
+    try:
+        sock.sendto(b"\x02", ("255.255.255.255", 1434))
+        end_time = __import__("time").time() + timeout
+        while True:
+            remaining = end_time - __import__("time").time()
+            if remaining <= 0:
+                break
+            sock.settimeout(remaining)
+            try:
+                data, addr = sock.recvfrom(4096)
+            except socket.timeout:
+                break
+            except OSError:
+                break
+            host = addr[0]
+            text = data.decode(errors="ignore")
+            for entry in text.split(";;"):
+                server_name = None
+                instance_name = None
+                parts = entry.split(";")
+                for i in range(0, len(parts) - 1, 2):
+                    key = parts[i]
+                    val = parts[i + 1] if i + 1 < len(parts) else ""
+                    if key == "ServerName":
+                        server_name = val
+                    elif key == "InstanceName":
+                        instance_name = val
+                if server_name:
+                    label = f"{server_name}\\{instance_name}" if instance_name and instance_name != "MSSQLSERVER" else server_name
+                    found[label] = host
+    finally:
+        sock.close()
+    return sorted(found.keys())
+
+
+def list_databases(server: str, user: str, password: str) -> list[str]:
+    """
+    Connect to the given server's master database (without selecting a
+    target database) and return all non-system database names.
+    """
+    host, port = _parse_server(server)
+    names: list[str] = []
+    last_err = None
+
+    try:
+        import pymssql  # type: ignore
+        conn = pymssql.connect(
+            server=host, port=port, database="master",
+            user=user, password=password,
+            tds_version="7.4", charset="UTF-8", login_timeout=10,
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT name FROM sys.databases "
+            "WHERE database_id > 4 ORDER BY name"
+        )
+        names = [row[0] for row in cur.fetchall()]
+        cur.close()
+        conn.close()
+        return names
+    except Exception as e:
+        last_err = e
+
+    try:
+        import pyodbc  # type: ignore
+        available = [d for d in pyodbc.drivers() if any(x in d for x in ["SQL Server", "FreeTDS"])]
+        candidates = available or ["ODBC Driver 18 for SQL Server", "ODBC Driver 17 for SQL Server", "SQL Server", "FreeTDS"]
+        for driver in candidates:
+            try:
+                cs = (
+                    f"DRIVER={{{driver}}};SERVER={server};DATABASE=master;"
+                    f"UID={user};PWD={password};TDS_Version=7.4;Encrypt=no;"
+                )
+                conn = pyodbc.connect(cs, timeout=10)
+                cur = conn.cursor()
+                cur.execute("SELECT name FROM sys.databases WHERE database_id > 4 ORDER BY name")
+                names = [row[0] for row in cur.fetchall()]
+                cur.close()
+                conn.close()
+                return names
+            except Exception as e:
+                last_err = e
+    except Exception as e:
+        last_err = e
+
+    raise RuntimeError(f"Could not list databases: {last_err}")
 
 
 def normalize(v: Any) -> str | None:

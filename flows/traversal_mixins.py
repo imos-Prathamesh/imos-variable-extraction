@@ -12,7 +12,7 @@ from core.branches import (
     STATE_CONNECTIONS, STATE_CONNDESC, STATE_CONNEXTRA,
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
-    STATE_IDENT, STATE_IMOS,
+    STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF,
 )
 from core.parser import parse
 
@@ -53,10 +53,10 @@ class ConnectionTreeMixin:
         groove = normalize(row.get("GROOVE"))
         if groove:
             groove_path = path + [f"GROOVE={groove}"]
-            self._generic_branch(groove, STATE_NUT_ERB, groove_path)
+            self._nut_erb_branch(groove, groove_path)
             self._extrupar_branch(groove, groove_path)
             self._extrucon_branch(groove, groove_path)
-        for col in ("LINDIV", "LINDIV2", "ROTATION", "POSPART0VAR", "SNAPRADI", "VARIANT"):
+        for col in ("LINDIV", "LINDIV2", "ROTATION", "POSPART0VAR", "POSPART1VAR", "SNAPRADI", "VARIANT"):
             val = normalize(row.get(col))
             if val:
                 self._classify(val, STATE_CONNECTIONS, path + [f"{col}={val}"], "CONNECTIONS", col)
@@ -140,7 +140,7 @@ class ConnectionTreeMixin:
         for row in rows:
             groove = normalize(row.get("GROOVE"))
             if groove:
-                self._generic_branch(groove, STATE_NUT_ERB, path + [f"extrupar.GROOVE={groove}"])
+                self._nut_erb_branch(groove, path + [f"extrupar.GROOVE={groove}"])
             render = normalize(row.get("RENDER"))
             if render:
                 self._generic_branch(render, STATE_RENDER, path + [f"extrupar.RENDER={render}"])
@@ -150,9 +150,23 @@ class ConnectionTreeMixin:
             sectname = normalize(row.get("SECTNAME"))
             if sectname:
                 self._generic_branch(sectname, STATE_CONTELEM, path + [f"extrupar.SECTNAME={sectname}"])
+            mat = normalize(row.get("MAT"))
+            if mat:
+                pv = parse(mat)
+                if pv and pv.is_raw:
+                    self._mat_branch(mat, path + [f"extrupar.MAT={mat}"])
+                else:
+                    self._classify(mat, STATE_CONNECTIONS, path + [f"extrupar.MAT={mat}"], "extrupar", "MAT")
+            surf = normalize(row.get("SURF"))
+            if surf:
+                pv = parse(surf)
+                if pv and pv.is_raw:
+                    self._surf_branch(surf, path + [f"extrupar.SURF={surf}"])
+                else:
+                    self._classify(surf, STATE_CONNECTIONS, path + [f"extrupar.SURF={surf}"], "extrupar", "SURF")
             for col in ("GAP", "ARTIKELNR", "INFOFOLDER", "SCFACTOR", "SLWEIGHT", "SAUFMASS",
                         "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN",
-                        "TEXT", "TEXT2", "MAT", "SURF", "MATOR", "SURFOR"):
+                        "TEXT", "TEXT2", "MATOR", "SURFOR"):
                 val = normalize(row.get(col))
                 if val:
                     self._classify(val, STATE_CONNECTIONS, path + [f"extrupar.{col}={val}"], "extrupar", col)
@@ -191,6 +205,64 @@ class ConnectionTreeMixin:
                     self._profil_branch(prf, grp_path + [f"WORKGROUP.PRF={prf}"])
                 if contour:
                     self._generic_branch(contour, STATE_CONTELEM, grp_path + [f"WORKGROUP.CONTOUR={contour}"])
+
+    def _nut_erb_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_NUT_ERB]
+        rows = _fetch_branch(branch, name)
+        _profile_cols = {"PRFNAMEBO", "PRFNAMESE"}
+        for row in rows:
+            for col in branch.value_columns:
+                val = normalize(row.get(col))
+                if not val:
+                    continue
+                if col in _profile_cols:
+                    self._generic_branch(val, STATE_PROFIL, path + [f"nut_erb.{col}={val}"])
+                else:
+                    self._classify(val, branch.next_state, path + [f"nut_erb.{col}={val}"], "nut_erb", col)
+
+    def _mat_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_MAT]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in branch.value_columns:
+                if col == "RENDER_PRZ":
+                    continue
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS, path + [f"MAT.{col}={val}"], "MAT", col)
+            render_prz = normalize(row.get("RENDER_PRZ"))
+            if render_prz:
+                self._resolve_then_render(render_prz, path + [f"MAT.RENDER_PRZ={render_prz}"])
+
+    def _surf_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_SURF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in branch.value_columns:
+                if col in ("RENDER_PRZ", "VPART_MAT"):
+                    continue
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS, path + [f"SURF.{col}={val}"], "SURF", col)
+            render_prz = normalize(row.get("RENDER_PRZ"))
+            if render_prz:
+                self._resolve_then_render(render_prz, path + [f"SURF.RENDER_PRZ={render_prz}"])
+            vpart_mat = normalize(row.get("VPART_MAT"))
+            if vpart_mat:
+                pv = parse(vpart_mat)
+                if pv and pv.is_raw:
+                    self._mat_branch(vpart_mat, path + [f"SURF.VPART_MAT={vpart_mat}"])
+                else:
+                    self._classify(vpart_mat, STATE_CONNECTIONS, path + [f"SURF.VPART_MAT={vpart_mat}"], "SURF", "VPART_MAT")
 
     def _profil_branch(self, name, path):
         from core.traversal_base import _fetch_branch

@@ -1,7 +1,7 @@
 # Source : flows/traversal_myflow.py
 # Analogy: Blank blueprint — copy this file to create any new flow. Not used in production, just a starter template.
 from core.traversal_base import BaseTraversal, ExtractionResult
-from traversal_mixins import ConnectionTreeMixin  # or ImosMixin or both
+from flows.traversal_mixins import ConnectionTreeMixin  # or ImosMixin or both
 from core.db import query, normalize
 from core.branches import STATE_CONISITU  # whatever entry state applies
 

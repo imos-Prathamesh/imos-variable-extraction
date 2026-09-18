@@ -17,6 +17,7 @@ class TraversalAnglgrtx(ImosMixin, BaseTraversal):
             "JOIN dbo.anglgrtx ag "
             "  ON ag.NAME = a.NAME COLLATE Latin1_General_CI_AS "
             "WHERE a.NAME = ? "
+            "  AND NULLIF(LTRIM(RTRIM(a.INORDER)), N'') IS NULL "
             "  AND NULLIF(LTRIM(RTRIM(ag.INORDER)), N'') IS NULL",
             (self.article,)
         )
@@ -30,3 +31,7 @@ class TraversalAnglgrtx(ImosMixin, BaseTraversal):
 
 def extract_anglgrtx(article: str, max_depth: int = 40) -> ExtractionResult:
     return TraversalAnglgrtx(article, max_depth).run()
+
+
+FLOW_NAME = "anglgrtx"
+extract = extract_anglgrtx

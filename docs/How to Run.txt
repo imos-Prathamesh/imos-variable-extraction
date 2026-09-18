@@ -1,23 +1,86 @@
-How to Test
-No DB needed:
+How to Run — IMOS Variable Extractor
+═══════════════════════════════════════
 
-python main.py --test-parser
+Launch the Web UI (default)
+────────────────────────────
+No arguments — opens the NiceGUI dashboard in your browser:
 
-DB connection check:
+    python main.py
 
-python main.py --test-connection
+Use the "Settings" tab to enter DB credentials, "Run" tab to pick an
+article + workflow, "Results" tab to view/filter/copy output.
 
-List articles:
+New flows you add later appear automatically in the Workflow dropdown.
+If you add a flow file while the UI is already running, click
+"↻ Refresh Flow List" in the Run tab (no restart needed).
 
-python main.py --list-articles 20
 
-Test with article (anglconi flow):
+Basic Sanity Checks (no DB needed for parser test)
+────────────────────────────────────────────────────
+    python main.py --test-parser
+    python main.py --test-connection
+    python main.py --list-articles 20
 
-python main.py --article "ARTICLE_NAME"
-python main.py --article "ARTICLE_NAME" --occurrences
-python main.py --article "ARTICLE_NAME" --csv out.csv
 
-Test with article (anglclie flow):
+List Registered Flows
+────────────────────────
+There is no dedicated "--list-flows" flag. To see all currently
+registered flow names, pass an invalid one — the error message
+lists everything available:
 
-python main.py --article "ARTICLE_NAME" --flow anglclie
+    python main.py --article "X" --flow doesnotexist
 
+Example output:
+    ✗ Unknown flow: doesnotexist. Available: anglclie, anglconi, anglgrtx
+
+
+Test a Single Article — One Specific Flow
+────────────────────────────────────────────
+    python main.py --article "ARTICLE_NAME" --flow anglconi
+    python main.py --article "ARTICLE_NAME" --flow anglclie
+    python main.py --article "ARTICLE_NAME" --flow anglgrtx
+    python main.py --article "ARTICLE_NAME" --flow <any_registered_flow_name>
+
+
+Test a Single Article — ALL Registered Flows at Once
+──────────────────────────────────────────────────────
+Omit --flow entirely. This loops through every flow currently in the
+registry automatically — including any new ones you add, with zero
+code changes required:
+
+    python main.py --article "ARTICLE_NAME"
+
+
+Show Full Occurrence Paths (not just unique variables)
+──────────────────────────────────────────────────────────
+    python main.py --article "ARTICLE_NAME" --flow anglconi --occurrences
+
+
+Save Results to CSV
+────────────────────
+    python main.py --article "ARTICLE_NAME" --flow anglconi --csv output/results.csv
+
+
+Extract ALL Articles (every flow that supports extract_all)
+─────────────────────────────────────────────────────────────
+    python main.py --all --csv output/all_results.csv
+
+Note: only flows that define an extract_all() function are included
+here. Flows without it are skipped with a warning printed to console.
+
+
+Adjust Max Traversal Depth (optional, default 40)
+──────────────────────────────────────────────────
+    python main.py --article "ARTICLE_NAME" --flow anglconi --max-depth 60
+
+
+Quick Reality Check for "0 results"
+──────────────────────────────────────
+If a flow returns 0 variables for a real article, it usually means
+that flow's source table has no matching row for that article with
+a blank INORDER column — not a bug. Confirm directly in SQL, e.g.:
+
+    SELECT * FROM dbo.anglconi WHERE NAME = 'YOUR_ARTICLE'
+
+If that returns 0 rows (or INORDER is populated on all rows), an
+empty result from the anglconi flow is correct behavior.

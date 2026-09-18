@@ -35,6 +35,10 @@ def extract_article(article: str, max_depth: int = 40) -> ExtractionResult:
     return TraversalAnglconi(article, max_depth).run()
 
 
+FLOW_NAME = "anglconi"
+extract = extract_article
+
+
 def extract_all_articles(max_depth: int = 40) -> list[ExtractionResult]:
     from core.db import query as _query
     rows = _query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
@@ -45,3 +49,6 @@ def extract_all_articles(max_depth: int = 40) -> list[ExtractionResult]:
             print(f"  Extracting: {name}")
             results.append(extract_article(name, max_depth))
     return results
+
+
+extract_all = extract_all_articles
