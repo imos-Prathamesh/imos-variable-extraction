@@ -160,7 +160,7 @@ BRANCHES: dict[str, Branch] = {
         match_table="RENDER",
         match_column="NAME",
         filter_column="INORDER",
-        value_columns=["CODE1", "CODE2", "SCOST", "SCFACTOR"],
+        value_columns=["CODE1", "CODE2", "CODE3", "SCOST", "SCFACTOR"],
         next_state=STATE_TERMINAL,
         order_columns=[],
     ),
@@ -229,7 +229,7 @@ BRANCHES: dict[str, Branch] = {
         filter_column="INORDER",
         value_columns=[
             "SECTNAME", "CONT", "GROOVE", "GAP",
-            "ARTIKELNR", "RENDER", "INFOFOLDER",
+            "ORDERID", "ARTIKELNR", "RENDER", "INFOFOLDER",
             "SCFACTOR", "SLWEIGHT", "SAUFMASS",
             "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN",
             "TEXT", "TEXT2", "MAT", "SURF", "MATOR", "SURFOR",
@@ -257,7 +257,7 @@ BRANCHES: dict[str, Branch] = {
         match_column="NAME",
         filter_column="INORDER",
         value_columns=[
-            "COMMENT", "INFO1", "INFO2", "INFO3", "INFO4", "INFO5",
+            "COMMENT", "NCNUMBER", "INFO1", "INFO2", "INFO3", "INFO4", "INFO5",
             "INFO6", "INFO7", "INFO8", "INFO9", "INFO10",
             "SERIALTEXT", "ARTICLE_ID",
         ],

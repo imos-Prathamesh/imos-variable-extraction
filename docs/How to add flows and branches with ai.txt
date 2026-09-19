@@ -1,0 +1,126 @@
+How to Add New Flows / Branches with AI — IMOS Variable Extractor
+════════════════════════════════════════════════════════════════════
+
+This file supplements docs/How to Add a New Flow.txt. It covers the
+harder real-world case: many diagrams share the same starting point
+(articles.NAME) but diverge at different tables/columns, sometimes
+with a single step matching against MANY candidate tables at once.
+
+
+TWO KINDS OF "NEW DIAGRAM" — TELL THEM APART FIRST
+─────────────────────────────────────────────────────
+
+1) NEW FLOW (new file needed)
+   The entry chain itself is different — a different 2nd table,
+   or a different 3rd-level column, that starts a fresh traversal.
+
+   Example:
+     articles.NAME → anglconi.NAME → CONISITU        → ...   (flow A)
+     articles.NAME → anglconi.NAME → CONNSELATTR.NAME → ...  (flow B)
+     articles.NAME → anglBP.NAME   → CONISITU        → ...   (flow C)
+     articles.NAME → anglelem.CPNAME → GARU          → ...   (flow D)
+
+   Each of these is a NEW FILE.
+
+2) NEW BRANCH inside an existing flow (no new file — edit existing file)
+   The SAME value (e.g. CONISITU after $ resolves) can match against
+   MANY different candidate tables. Adding one more candidate table
+   is NOT a new flow — it's one more branch inside the SAME file.
+
+   Example — CONISITU can raw-match any of:
+     ARTICLEXMLATTR.NAME, ARTICLEXMLVIS.OPT, CONNDESCRFOLDER.NAME,
+     CONNECTIONS.NAME, CONNECTIONS.TEXT_SHORT, CONNECTIONSATTR.CONNVALUE,
+     CONNECTIONSATTR.SITUNAME, CONNSELATTR.CONNVALUE, extrucon.CONNAME,
+     IDBVAR.NAME, IDBVAR.VARVAL, KMSCONNECTIONS.CONNECTID, ... (25+)
+
+   Adding "CONNSELATTR.CONNVALUE" as a new candidate is a BRANCH,
+   not a new flow. Stays inside traversal_anglconi_conisitu.py.
+
+Quick test: "Does this start a brand-new articles.NAME → X.NAME →
+Y.column chain?" YES → new file. NO, it's another way the SAME
+value can match → same file, new candidate/branch.
+
+
+FILE NAMING CONVENTION
+─────────────────────────
+
+Name files by the DIVERGENCE POINT, not the shared prefix:
+
+    traversal_<2ndtable>_<3rdkey>.py
+
+Examples:
+    traversal_anglconi_conisitu.py     (articles→anglconi→CONISITU)
+    traversal_anglconi_connselattr.py  (articles→anglconi→CONNSELATTR.NAME)
+    traversal_anglbp_conisitu.py       (articles→anglBP→CONISITU)
+    traversal_anglelem_garu.py         (articles→anglelem→GARU)
+
+Do NOT use full path names like
+"anglconi_conisitu_to_connections_name.py" — too long, breaks
+when the tree grows. The short divergence-point name is enough
+because the deeper tree lives INSIDE the file via mixins/branches.
+
+
+CANDIDATE-TABLE PATTERN (for case 2 above)
+──────────────────────────────────────────────
+
+When one value can match many possible tables, keep a candidate
+list and try each in turn (mirrors the diagram's repeated
+"Match found? YES/NO" diamonds):
+
+    CONISITU_CANDIDATES = [
+        ("ARTICLEXMLATTR", "NAME"),
+        ("ARTICLEXMLVIS", "OPT"),
+        ("CONNDESCRFOLDER", "NAME"),
+        ("CONNECTIONS", "NAME"),
+        ("CONNECTIONS", "TEXT_SHORT"),
+        ("CONNECTIONSATTR", "CONNVALUE"),
+        ("CONNSELATTR", "CONNVALUE"),
+        # ... add new ones here
+    ]
+
+Each candidate that matches triggers its own branch handling
+(defined in core/branches.py + flows/traversal_mixins.py), same
+as any other Branch entry.
+
+
+WHAT TO GIVE THE AI FOR EACH CASE
+───────────────────────────────────
+
+Case 1 — NEW FLOW:
+    Give: the new diagram's .iflow/.json/.md, plus
+          core/branches.py, core/traversal_base.py,
+          flows/traversal_mixins.py (for reusable patterns)
+    Say:  "New flow, new starting chain: articles→X→Y.
+           Create flows/traversal_<x>_<y>.py"
+
+Case 2 — NEW BRANCH (candidate table) inside existing flow:
+    Give: the new branch's .iflow/.json/.md (just that piece),
+          the EXISTING traversal_<flow>.py file it belongs to,
+          core/branches.py, flows/traversal_mixins.py
+    Say:  "New candidate table for <existing state>: <TABLE>.<COLUMN>.
+           Add it to the candidate list, do not create a new file."
+
+Files that typically change for Case 2:
+    - core/branches.py          (add new Branch entry)
+    - flows/traversal_mixins.py (add candidate + branch method if
+                                  it needs special sub-routing)
+    - traversal_<flow>.py       (rarely — only if entry query changes)
+
+These are additive changes (Find & Replace style), not rewrites.
+
+
+DOCS THAT NEED SMALL UPDATES
+────────────────────────────────
+
+docs/README_IMOS.MD, docs/README_PROJECT.md, and
+docs/How to Add a New Flow.txt currently describe ONE table per
+state (simple 1:1 branching). They should get a short note
+pointing to this file, explaining:
+
+    - the candidate-table pattern (many tables, one state)
+    - the file-naming convention (divergence point, not full path)
+    - the new-flow-vs-new-branch decision test
+
+No other changes needed in those three files — their existing
+step-by-step instructions for single-table flows still work fine
+for the traditional cases (anglclie, anglgrtx, etc).

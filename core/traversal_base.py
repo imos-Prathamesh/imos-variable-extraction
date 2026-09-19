@@ -160,7 +160,16 @@ class BaseTraversal:
             self._active.discard(state_key)
 
         if pv.is_raw:
-            self._enter_connections(value, path, source_table, source_column)
+            if state == STATE_CONNECTIONS:
+                self._enter_connections(value, path, source_table, source_column)
+            elif state == STATE_TERMINAL:
+                pass
+            else:
+                branch = BRANCHES.get(state)
+                if branch is not None:
+                    self._generic_branch(value, state, path)
+                else:
+                    self._enter_connections(value, path, source_table, source_column)
 
     # ── record helper ─────────────────────────────────────────────────────────
 

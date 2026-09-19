@@ -18,6 +18,7 @@ class TraversalAnglconi(ConnectionTreeMixin, BaseTraversal):
             "JOIN dbo.anglconi ac "
             "  ON ac.NAME = a.NAME COLLATE Latin1_General_CI_AS "
             "WHERE a.NAME = ? "
+            "  AND NULLIF(LTRIM(RTRIM(a.INORDER)), N'') IS NULL "
             "  AND NULLIF(LTRIM(RTRIM(ac.INORDER)), N'') IS NULL "
             "ORDER BY ac.SEQUENCENUM, ac.ELEMID",
             (self.article,)
