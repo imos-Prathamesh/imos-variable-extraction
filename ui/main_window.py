@@ -225,6 +225,7 @@ def index_page() -> None:
     ui.query("body").style("background:#f0f2f5; font-family:'Segoe UI',sans-serif")
 
     _all_rows: list[dict] = []
+    _last_run: dict = {}
     _filters: dict = {
         "article": "", "var_type": "", "variable_name": "",
         "value": "", "source_table": "", "source_column": "",
@@ -443,9 +444,35 @@ def index_page() -> None:
                         prog_run.set_value(v)
                         await asyncio.sleep(0.15)
 
-                async def on_run():
-                    nonlocal _all_rows
+                async def _execute_run(workflow, art, all_arts, arts, switch_tab: bool):
+                    nonlocal _all_rows, _last_run
                     from nicegui import run as nicegui_run
+
+                    lbl_run.style("color:#2563eb").set_text("Running extraction…")
+                    prog_run.set_visibility(True)
+                    prog_run.set_value(0)
+                    anim_task = ui.timer(0.15, lambda: prog_run.set_value(
+                        0.08 if prog_run.value >= 0.9 else prog_run.value + 0.08))
+                    try:
+                        occ       = await nicegui_run.io_bound(
+                            _run_flow, workflow, art, all_arts, arts)
+                        var_names = list({o.variable_name for o in occ})
+                        typ_map   = await nicegui_run.io_bound(_fetch_typ_map, var_names)
+                        _all_rows = _build_rows(occ, typ_map)
+                        prog_run.set_value(1.0)
+                        lbl_run.style("color:#16a34a").set_text(f"✓ {len(_all_rows)} occurrences found")
+                        _last_run = {"workflow": workflow, "art": art, "all_arts": all_arts, "arts": arts}
+                        btn_rerun.set_visibility(True)
+                        _apply_filters()
+                        if switch_tab:
+                            tabs.set_value(t_results)
+                    except Exception as e:
+                        lbl_run.style("color:#dc2626").set_text(f"✗ {e}")
+                    finally:
+                        anim_task.cancel()
+                        prog_run.set_visibility(False)
+
+                async def on_run():
                     art  = None
                     arts = None
                     if chk_all.value:
@@ -461,26 +488,13 @@ def index_page() -> None:
                             lbl_run.style("color:#d97706").set_text("⚠ Select an article or check All Articles")
                             return
 
-                    lbl_run.style("color:#2563eb").set_text("Running extraction…")
-                    prog_run.set_visibility(True)
-                    prog_run.set_value(0)
-                    anim_task = ui.timer(0.15, lambda: prog_run.set_value(
-                        0.08 if prog_run.value >= 0.9 else prog_run.value + 0.08))
-                    try:
-                        occ       = await nicegui_run.io_bound(
-                            _run_flow, sel_workflow.value, art, chk_all.value, arts)
-                        var_names = list({o.variable_name for o in occ})
-                        typ_map   = await nicegui_run.io_bound(_fetch_typ_map, var_names)
-                        _all_rows = _build_rows(occ, typ_map)
-                        prog_run.set_value(1.0)
-                        lbl_run.style("color:#16a34a").set_text(f"✓ {len(_all_rows)} occurrences found")
-                        _apply_filters()
-                        tabs.set_value(t_results)
-                    except Exception as e:
-                        lbl_run.style("color:#dc2626").set_text(f"✗ {e}")
-                    finally:
-                        anim_task.cancel()
-                        prog_run.set_visibility(False)
+                    await _execute_run(sel_workflow.value, art, chk_all.value, arts, switch_tab=True)
+
+                async def on_rerun():
+                    if not _last_run:
+                        return
+                    await _execute_run(_last_run["workflow"], _last_run["art"],
+                                        _last_run["all_arts"], _last_run["arts"], switch_tab=False)
 
                 with ui.row().classes("q-mt-md").style("gap:8px"):
                     ui.button("RUN", on_click=on_run).classes("btn-orange").props("unelevated").style(
@@ -494,6 +508,9 @@ def index_page() -> None:
                     "font-size:13px; font-weight:700; color:#1e40af; "
                     "background:#eff6ff; padding:4px 12px; border-radius:20px; "
                     "border:1px solid #bfdbfe")
+                btn_rerun = ui.button("⟳ Rerun", on_click=lambda: on_rerun()).classes(
+                    "btn-orange").props("unelevated dense")
+                btn_rerun.set_visibility(False)
                 chk_unique = ui.checkbox("Unique Variables Only",
                                          on_change=lambda e: _set_filter("unique", e.value))
                 inp_search = ui.input(placeholder="🔍  Search variable name…",
@@ -518,7 +535,7 @@ def index_page() -> None:
                 columns=[
                     {"name": "expand",        "label": "",          "field": "expand",        "align": "center",
                      "style": "width:32px"},
-                    {"name": "num",           "label": "#",         "field": "num",           "align": "right",
+                    {"name": "num",           "label": "#",         "field": "num",           "align": "right", "sortable": True,
                      "style": "width:50px; color:#94a3b8; font-family:monospace; font-weight:700"},
                     {"name": "article",       "label": "Article",   "field": "article",       "align": "left", "sortable": True},
                     {"name": "var_type",      "label": "Var. Type", "field": "var_type",      "align": "left", "sortable": True},

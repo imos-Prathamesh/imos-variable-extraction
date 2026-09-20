@@ -116,6 +116,15 @@ If the new table needs special column routing (like different columns going to d
 
 ---
 
+## 4a. New Candidate Table vs New Flow (read this before adding anything)
+
+Sometimes one value (like CONISITU) can match many possible tables —
+that is NOT a new flow, just a new candidate branch inside the existing
+file. A new flow file is only needed when the starting chain itself
+changes (different 2nd or 3rd table). See docs/How_to_Add_Flows_and_Branches_with_AI.txt
+for the full decision guide, file naming convention, and what to give
+an AI assistant for each case.
+
 ## 5. How to Add a Brand New Workflow (completely separate flow)
 
 See docs/How to Add a New Flow.txt for the full step-by-step guide and worked examples. Short version:

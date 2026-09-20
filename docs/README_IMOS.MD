@@ -140,3 +140,7 @@ Note: a flow returning 0 results for a real article is normal if that flow's sou
 ## Adding More Flows
 
 See docs/How to Add a New Flow.txt. Short version: copy flows/traversal_myflow.py, point it at your table, add FLOW_NAME + extract at the bottom. No other file needs to be touched — it appears automatically in CLI and UI.
+
+If a single value can match several possible tables (not a new starting
+point), that's a new candidate branch inside an existing flow file, not
+a new flow. See docs/How_to_Add_Flows_and_Branches_with_AI.txt.
