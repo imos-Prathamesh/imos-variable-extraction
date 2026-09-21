@@ -168,52 +168,88 @@ from nicegui import ui  # noqa: E402
 
 
 _CSS = """
-    .q-tabs { background:#ffffff !important; border-bottom:2px solid #e2e8f0 !important; }
-    .q-tab { color:#64748b !important; font-weight:600 !important; font-size:13px !important; letter-spacing:0.04em !important; }
-    .q-tab--active { color:#1e40af !important; }
-    .q-tab__indicator { background:#1e40af !important; height:3px !important; }
-    .q-tab-panels { background:#f0f2f5 !important; }
-    .imos-card {
-        background:#ffffff !important;
-        border-radius:12px !important;
-        border:1px solid #e2e8f0 !important;
-        box-shadow:0 1px 6px rgba(0,0,0,0.06) !important;
+    :root {
+        --imos-primary:      #4f46e5;
+        --imos-primary-dark: #3730a3;
+        --imos-accent:       #f59e0b;
+        --imos-success:      #059669;
+        --imos-danger:       #e11d48;
+        --imos-bg:           #f4f5fb;
+        --imos-surface:      #ffffff;
+        --imos-border:       #e4e6f1;
+        --imos-text:         #1e1b3a;
+        --imos-muted:        #6b7086;
     }
-    .q-field__control { background:#f8fafc !important; border-radius:8px !important; }
-    .q-field__native, .q-field__input { color:#1e293b !important; font-size:14px !important; }
-    .q-field--outlined .q-field__control:before { border-color:#cbd5e1 !important; }
-    .q-field--outlined .q-field__control:hover:before { border-color:#3b82f6 !important; }
-    .q-field--outlined.q-field--focused .q-field__control:before { border-color:#1e40af !important; border-width:2px !important; }
-    .q-field__label { color:#64748b !important; font-size:13px !important; }
-    .q-field__append .q-icon { color:#94a3b8 !important; }
-    .q-checkbox__inner { color:#1e40af !important; }
-    .q-checkbox__label { color:#374151 !important; font-size:13px !important; font-weight:500 !important; }
-    .imos-table { background:#ffffff !important; border-radius:10px !important; border:1px solid #e2e8f0 !important; overflow:hidden !important; }
+    body { background:var(--imos-bg) !important; }
+    .q-tabs { background:var(--imos-surface) !important; border-bottom:2px solid var(--imos-border) !important; }
+    .q-tab { color:var(--imos-muted) !important; font-weight:600 !important; font-size:13px !important; letter-spacing:0.04em !important; }
+    .q-tab--active { color:var(--imos-primary) !important; }
+    .q-tab__indicator { background:linear-gradient(90deg, var(--imos-primary), var(--imos-accent)) !important; height:3px !important; }
+    .q-tab-panels { background:var(--imos-bg) !important; }
+    .imos-card {
+        background:var(--imos-surface) !important;
+        border-radius:14px !important;
+        border:1px solid var(--imos-border) !important;
+        box-shadow:0 4px 16px rgba(79,70,229,0.06) !important;
+    }
+    .q-field__control { background:#f7f7fc !important; border-radius:9px !important; }
+    .q-field__native, .q-field__input { color:var(--imos-text) !important; font-size:14px !important; }
+    .q-field--outlined .q-field__control:before { border-color:#d6d8ea !important; }
+    .q-field--outlined .q-field__control:hover:before { border-color:var(--imos-primary) !important; }
+    .q-field--outlined.q-field--focused .q-field__control:before { border-color:var(--imos-primary) !important; border-width:2px !important; }
+    .q-field__label { color:var(--imos-muted) !important; font-size:13px !important; }
+    .q-field__append .q-icon { color:#a0a3bd !important; }
+    .q-checkbox__inner { color:var(--imos-primary) !important; }
+    .q-checkbox__label { color:#3d3f57 !important; font-size:13px !important; font-weight:500 !important; }
+    .btn-primary .q-btn__content .block, .btn-orange .q-btn__content .block, .btn-danger .q-btn__content .block {
+        color:#000000 !important;
+        font-weight:800 !important;
+    }
+    .imos-table { background:var(--imos-surface) !important; border-radius:12px !important; border:1px solid var(--imos-border) !important; overflow:hidden !important; }
     .imos-table .q-table thead tr th {
-        background:#f8fafc !important;
-        color:#374151 !important;
+        background:linear-gradient(180deg, #f7f7fd, #f0f0fa) !important;
+        color:#3d3f57 !important;
         font-weight:700 !important;
         font-size:12px !important;
         letter-spacing:0.05em !important;
         text-transform:uppercase !important;
-        border-bottom:2px solid #e2e8f0 !important;
+        border-bottom:2px solid var(--imos-border) !important;
         padding:10px 12px !important;
     }
-    .imos-table .q-table tbody tr td { color:#1e293b !important; font-size:13px !important; padding:8px 12px !important; }
-    .imos-table .q-table tbody tr { border-bottom:1px solid #f1f5f9 !important; }
-    .imos-table .q-table tbody tr:hover td { background:#eff6ff !important; }
-    .btn-primary { background:#1e40af !important; color:#ffffff !important; border-radius:8px !important; font-weight:600 !important; }
-    .btn-orange { background:#f97316 !important; color:#ffffff !important; border-radius:8px !important; font-weight:700 !important; }
-    .btn-secondary { background:#f1f5f9 !important; color:#374151 !important; border-radius:8px !important; font-weight:600 !important; border:1px solid #e2e8f0 !important; }
-    .btn-danger { background:#fee2e2 !important; color:#dc2626 !important; border-radius:8px !important; font-weight:600 !important; }
-    .filter-input .q-field__control { background:#ffffff !important; border-radius:6px !important; }
-    .filter-input .q-field__native { font-size:12px !important; color:#374151 !important; }
+    .imos-table .q-table tbody tr td { color:var(--imos-text) !important; font-size:13px !important; padding:8px 12px !important; }
+    .imos-table .q-table tbody tr { border-bottom:1px solid #f0f0f8 !important; }
+    .imos-table .q-table tbody tr:hover td { background:#eef0ff !important; }
+    .btn-primary, .btn-orange, .btn-secondary, .btn-danger {
+        background:#f97316 !important;
+        color:#000000 !important;
+        border-radius:9px !important;
+        font-weight:800 !important;
+        border:1px solid #c2410c !important;
+        box-shadow:0 2px 8px rgba(249,115,22,0.4) !important;
+    }
+    .btn-primary .q-btn__content, .btn-orange .q-btn__content,
+    .btn-secondary .q-btn__content, .btn-danger .q-btn__content {
+        color:#000000 !important;
+        font-weight:800 !important;
+    }
+    .filter-input .q-field__control { background:var(--imos-surface) !important; border-radius:7px !important; }
+    .filter-input .q-field__native { font-size:12px !important; color:#3d3f57 !important; }
     .env-badge {
-        background:#fef3c7; color:#92400e;
+        background:#fff3cf; color:#8a5a00;
         font-size:10px; font-weight:700;
         letter-spacing:0.08em;
         padding:3px 10px; border-radius:20px;
-        border:1px solid #fcd34d;
+        border:1px solid #f7d374;
+    }
+    .imos-header-badge {
+        font-size:12px; font-weight:700; color:var(--imos-primary-dark);
+        background:#eef0ff; padding:5px 14px; border-radius:20px;
+        border:1px solid #cfd3fb;
+    }
+    .imos-count-badge {
+        font-size:13px; font-weight:700; color:var(--imos-primary-dark);
+        background:#eef0ff; padding:4px 12px; border-radius:20px;
+        border:1px solid #cfd3fb;
     }
 """
 
@@ -222,7 +258,7 @@ ui.add_css(_CSS, shared=True)
 
 @ui.page("/")
 def index_page() -> None:
-    ui.query("body").style("background:#f0f2f5; font-family:'Segoe UI',sans-serif")
+    ui.query("body").style("font-family:'Segoe UI',sans-serif")
 
     _all_rows: list[dict] = []
     _last_run: dict = {}
@@ -234,26 +270,24 @@ def index_page() -> None:
 
     # ── header ───────────────────────────────────────────────────────────
     with ui.header().style(
-        "background:#ffffff; border-bottom:1px solid #e2e8f0; "
-        "box-shadow:0 2px 8px rgba(0,0,0,0.06); padding:0"
+        "background:linear-gradient(90deg, #ffffff, #f7f7ff); border-bottom:1px solid #e4e6f1; "
+        "box-shadow:0 2px 10px rgba(79,70,229,0.08); padding:0"
     ):
         with ui.row().classes("items-center justify-between w-full q-px-xl").style("height:62px"):
             with ui.row().classes("items-center").style("gap:14px"):
-                ui.label("💲").style("font-size:26px")
+                ui.label("💠").style("font-size:26px")
                 with ui.column().style("gap:1px"):
                     ui.label("imos iX Variable Extractor").style(
-                        "font-size:18px; font-weight:700; color:#1e293b; letter-spacing:0.01em")
+                        "font-size:18px; font-weight:700; color:#1e1b3a; letter-spacing:0.01em")
                     ui.label("Developer — Prathamesh Patil").style(
-                        "font-size:11px; color:#64748b; letter-spacing:0.04em")
+                        "font-size:11px; color:#6b7086; letter-spacing:0.04em")
             with ui.row().classes("items-center").style("gap:12px"):
                 _hdr_cfg = _load_cfg()
-                lbl_hdr_conn = ui.label(f"🖥 {_hdr_cfg.get('server','—')}  ›  {_hdr_cfg.get('database','—')}").style(
-                    "font-size:12px; font-weight:700; color:#1e3a8a; "
-                    "background:#eff6ff; padding:5px 14px; border-radius:20px; "
-                    "border:1px solid #bfdbfe")
+                lbl_hdr_conn = ui.label(f"🖥 {_hdr_cfg.get('server','—')}  ›  {_hdr_cfg.get('database','—')}").classes(
+                    "imos-header-badge")
                 ui.html('<span class="env-badge">⚗ TEST ENVIRONMENT</span>')
                 ui.label("$").style(
-                    "font-size:20px; font-weight:900; color:#1e40af; font-family:monospace; opacity:0.5")
+                    "font-size:20px; font-weight:900; color:#4f46e5; font-family:monospace; opacity:0.5")
 
     # ── tabs ─────────────────────────────────────────────────────────────
     with ui.tabs().classes("w-full") as tabs:
@@ -268,9 +302,9 @@ def index_page() -> None:
             with ui.element("div").classes("imos-card q-pa-lg").style("max-width:460px"):
                 with ui.row().classes("items-center q-mb-md").style("gap:10px"):
                     ui.element("div").style(
-                        "width:4px; height:20px; background:#1e40af; border-radius:2px")
+                        "width:4px; height:20px; background:linear-gradient(180deg,#4f46e5,#f59e0b); border-radius:2px")
                     ui.label("Database Credentials").style(
-                        "font-size:15px; font-weight:700; color:#1e293b")
+                        "font-size:15px; font-weight:700; color:#1e1b3a")
 
                 cfg = _load_cfg()
                 sel_server = ui.select([cfg.get("server", "")] if cfg.get("server") else [],
@@ -286,7 +320,7 @@ def index_page() -> None:
                 inp_pass = ui.input("Password", value=cfg.get("password", ""),
                                     password=True, password_toggle_button=True).classes("w-full")
 
-                lbl_conn = ui.label("").style("font-size:12px; color:#64748b; min-height:18px")
+                lbl_conn = ui.label("").style("font-size:12px; color:#6b7086; min-height:18px")
 
                 _servers_scanned = {"done": False}
                 _dbs_loaded_for = {"key": None}
@@ -295,38 +329,38 @@ def index_page() -> None:
                     if _servers_scanned["done"]:
                         return
                     _servers_scanned["done"] = True
-                    lbl_conn.style("color:#64748b").set_text("Scanning network (this can take a few seconds)…")
+                    lbl_conn.style("color:#6b7086").set_text("Scanning network (this can take a few seconds)…")
                     try:
                         from core.db import discover_sql_servers
                         found = discover_sql_servers()
                         if found:
                             sel_server.set_options(found)
-                            lbl_conn.style("color:#16a34a").set_text(f"✓ Found {len(found)} server(s)")
+                            lbl_conn.style("color:#059669").set_text(f"✓ Found {len(found)} server(s)")
                         else:
-                            lbl_conn.style("color:#d97706").set_text(
+                            lbl_conn.style("color:#b45309").set_text(
                                 "⚠ No servers responded (they may block discovery broadcasts — type the server manually)")
                     except Exception as e:
-                        lbl_conn.style("color:#dc2626").set_text(f"✗ {e}")
+                        lbl_conn.style("color:#e11d48").set_text(f"✗ {e}")
 
                 sel_server.on("popup-show", lambda: on_discover_servers())
 
                 def on_load_dbs():
                     if not sel_server.value or not inp_user.value:
-                        lbl_conn.style("color:#d97706").set_text(
+                        lbl_conn.style("color:#b45309").set_text(
                             "⚠ Enter Server and User first, then click Database again")
                         return
                     key = (sel_server.value, inp_user.value, inp_pass.value)
                     if _dbs_loaded_for["key"] == key:
                         return
-                    lbl_conn.style("color:#64748b").set_text("Loading database list…")
+                    lbl_conn.style("color:#6b7086").set_text("Loading database list…")
                     try:
                         from core.db import list_databases
                         names = list_databases(sel_server.value, inp_user.value, inp_pass.value)
                         sel_db.set_options(names)
                         _dbs_loaded_for["key"] = key
-                        lbl_conn.style("color:#16a34a").set_text(f"✓ {len(names)} database(s) found")
+                        lbl_conn.style("color:#059669").set_text(f"✓ {len(names)} database(s) found")
                     except Exception as e:
-                        lbl_conn.style("color:#dc2626").set_text(f"✗ {e}")
+                        lbl_conn.style("color:#e11d48").set_text(f"✗ {e}")
 
                 sel_db.on("popup-show", lambda: on_load_dbs())
 
@@ -338,31 +372,33 @@ def index_page() -> None:
                     CONFIG_FILE.write_text(json.dumps(new_cfg, indent=2))
                     _apply_env(new_cfg)
                     _reset_db_conn()
-                    lbl_conn.style("color:#16a34a").set_text("✓ Credentials saved")
+                    lbl_conn.style("color:#059669").set_text("✓ Credentials saved")
                     lbl_hdr_conn.set_text(f"🖥 {new_cfg.get('server','—')}  ›  {new_cfg.get('database','—')}")
 
                 def on_test():
                     _reset_db_conn()
-                    lbl_conn.style("color:#64748b").set_text("Connecting…")
+                    lbl_conn.style("color:#6b7086").set_text("Connecting…")
                     try:
                         from core.db import get_connection
                         get_connection()
-                        lbl_conn.style("color:#16a34a").set_text("✓ Connected successfully")
+                        lbl_conn.style("color:#059669").set_text("✓ Connected successfully")
                     except Exception as e:
-                        lbl_conn.style("color:#dc2626").set_text(f"✗ {e}")
+                        lbl_conn.style("color:#e11d48").set_text(f"✗ {e}")
 
                 with ui.row().classes("q-mt-md").style("gap:8px"):
-                    ui.button("Save", on_click=on_save).classes("btn-secondary").props("unelevated")
-                    ui.button("Test Connection", on_click=on_test).classes("btn-primary").props("unelevated")
+                    ui.button("Save", on_click=on_save).classes("btn-primary").props(
+                        "unelevated color=orange-8 text-color=black")
+                    ui.button("Test Connection", on_click=on_test).classes("btn-primary").props(
+                        "unelevated color=orange-8 text-color=black")
 
         # ── Run ──────────────────────────────────────────────────────────
         with ui.tab_panel(t_run):
             with ui.element("div").classes("imos-card q-pa-lg").style("max-width:460px"):
                 with ui.row().classes("items-center q-mb-md").style("gap:10px"):
                     ui.element("div").style(
-                        "width:4px; height:20px; background:#1e40af; border-radius:2px")
+                        "width:4px; height:20px; background:linear-gradient(180deg,#4f46e5,#f59e0b); border-radius:2px")
                     ui.label("Extract Variables").style(
-                        "font-size:15px; font-weight:700; color:#1e293b")
+                        "font-size:15px; font-weight:700; color:#1e1b3a")
 
                 sel_article  = ui.select([], label="Article", with_input=True).classes("w-full")
                 sel_articles_multi = ui.select([], label="Articles", multiple=True,
@@ -372,7 +408,7 @@ def index_page() -> None:
                 chk_all   = ui.checkbox("All Articles").classes("q-mt-xs")
                 sel_workflow = ui.select(_workflow_options(), label="Workflow",
                                          value=ALL_FLOWS_LABEL).classes("w-full q-mt-sm")
-                lbl_run      = ui.label("").style("font-size:12px; color:#64748b; min-height:18px")
+                lbl_run      = ui.label("").style("font-size:12px; color:#6b7086; min-height:18px")
 
                 _articles_loaded = {"done": False}
 
@@ -380,7 +416,7 @@ def index_page() -> None:
                     if _articles_loaded["done"]:
                         return
                     _articles_loaded["done"] = True
-                    lbl_run.style("color:#64748b").set_text("Loading articles…")
+                    lbl_run.style("color:#6b7086").set_text("Loading articles…")
                     try:
                         from core.db import query
                         rows = query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
@@ -389,10 +425,10 @@ def index_page() -> None:
                         sel_article.update()
                         sel_articles_multi.options = names
                         sel_articles_multi.update()
-                        lbl_run.style("color:#16a34a").set_text(f"✓ {len(names)} articles loaded")
+                        lbl_run.style("color:#059669").set_text(f"✓ {len(names)} articles loaded")
                     except Exception as e:
                         _articles_loaded["done"] = False
-                        lbl_run.style("color:#dc2626").set_text(f"✗ {e}")
+                        lbl_run.style("color:#e11d48").set_text(f"✗ {e}")
 
                 ui.timer(0.1, _load_articles, once=True)
 
@@ -433,22 +469,14 @@ def index_page() -> None:
                 prog_run = ui.linear_progress(value=0, show_value=False).classes("q-mt-sm")
                 prog_run.style(
                     "border-radius:6px; height:8px; "
-                    "--q-primary:#c2410c; background:#fed7aa")
+                    "--q-primary:#f59e0b; background:#fde7c2")
                 prog_run.set_visibility(False)
-
-                async def _animate_progress():
-                    import asyncio
-                    v = 0.0
-                    while prog_run.visible:
-                        v = 0.08 if v >= 0.9 else v + 0.08
-                        prog_run.set_value(v)
-                        await asyncio.sleep(0.15)
 
                 async def _execute_run(workflow, art, all_arts, arts, switch_tab: bool):
                     nonlocal _all_rows, _last_run
                     from nicegui import run as nicegui_run
 
-                    lbl_run.style("color:#2563eb").set_text("Running extraction…")
+                    lbl_run.style("color:#4f46e5").set_text("Running extraction…")
                     prog_run.set_visibility(True)
                     prog_run.set_value(0)
                     anim_task = ui.timer(0.15, lambda: prog_run.set_value(
@@ -460,14 +488,14 @@ def index_page() -> None:
                         typ_map   = await nicegui_run.io_bound(_fetch_typ_map, var_names)
                         _all_rows = _build_rows(occ, typ_map)
                         prog_run.set_value(1.0)
-                        lbl_run.style("color:#16a34a").set_text(f"✓ {len(_all_rows)} occurrences found")
+                        lbl_run.style("color:#059669").set_text(f"✓ {len(_all_rows)} occurrences found")
                         _last_run = {"workflow": workflow, "art": art, "all_arts": all_arts, "arts": arts}
                         btn_rerun.set_visibility(True)
                         _apply_filters()
                         if switch_tab:
                             tabs.set_value(t_results)
                     except Exception as e:
-                        lbl_run.style("color:#dc2626").set_text(f"✗ {e}")
+                        lbl_run.style("color:#e11d48").set_text(f"✗ {e}")
                     finally:
                         anim_task.cancel()
                         prog_run.set_visibility(False)
@@ -480,12 +508,12 @@ def index_page() -> None:
                     elif chk_multi.value:
                         arts = sel_articles_multi.value or []
                         if not arts:
-                            lbl_run.style("color:#d97706").set_text("⚠ Select at least one article")
+                            lbl_run.style("color:#b45309").set_text("⚠ Select at least one article")
                             return
                     else:
                         art = sel_article.value
                         if not art:
-                            lbl_run.style("color:#d97706").set_text("⚠ Select an article or check All Articles")
+                            lbl_run.style("color:#b45309").set_text("⚠ Select an article or check All Articles")
                             return
 
                     await _execute_run(sel_workflow.value, art, chk_all.value, arts, switch_tab=True)
@@ -497,19 +525,16 @@ def index_page() -> None:
                                         _last_run["all_arts"], _last_run["arts"], switch_tab=False)
 
                 with ui.row().classes("q-mt-md").style("gap:8px"):
-                    ui.button("RUN", on_click=on_run).classes("btn-orange").props("unelevated").style(
-                        "background:#f97316 !important; color:#ffffff !important")
+                    ui.button("RUN", on_click=on_run).classes("btn-orange").props(
+                        "unelevated color=orange-8 text-color=black")
 
         # ── Results ──────────────────────────────────────────────────────
         with ui.tab_panel(t_results):
 
             with ui.row().classes("items-center w-full q-mb-sm").style("gap:16px; flex-wrap:wrap"):
-                lbl_count = ui.label("No results").style(
-                    "font-size:13px; font-weight:700; color:#1e40af; "
-                    "background:#eff6ff; padding:4px 12px; border-radius:20px; "
-                    "border:1px solid #bfdbfe")
+                lbl_count = ui.label("No results").classes("imos-count-badge")
                 btn_rerun = ui.button("⟳ Rerun", on_click=lambda: on_rerun()).classes(
-                    "btn-orange").props("unelevated dense")
+                    "btn-orange").props("unelevated dense color=orange-8 text-color=black")
                 btn_rerun.set_visibility(False)
                 chk_unique = ui.checkbox("Unique Variables Only",
                                          on_change=lambda e: _set_filter("unique", e.value))
@@ -520,7 +545,7 @@ def index_page() -> None:
             with ui.element("div").classes("imos-card q-pa-sm q-mb-sm"):
                 with ui.row().classes("items-center").style("gap:6px; flex-wrap:wrap"):
                     ui.label("FILTER").style(
-                        "font-size:10px; font-weight:700; color:#1e40af; "
+                        "font-size:10px; font-weight:700; color:#4f46e5; "
                         "letter-spacing:0.1em; min-width:44px")
                     f_article = ui.input(placeholder="Article",  on_change=lambda e: _set_filter("article",       e.value)).props("dense outlined clearable").style("width:120px").classes("filter-input")
                     f_vartype = ui.input(placeholder="Var Type", on_change=lambda e: _set_filter("var_type",      e.value)).props("dense outlined clearable").style("width:120px").classes("filter-input")
@@ -529,14 +554,15 @@ def index_page() -> None:
                     f_table   = ui.input(placeholder="Table",    on_change=lambda e: _set_filter("source_table",  e.value)).props("dense outlined clearable").style("width:100px").classes("filter-input")
                     f_col     = ui.input(placeholder="Column",   on_change=lambda e: _set_filter("source_column", e.value)).props("dense outlined clearable").style("width:100px").classes("filter-input")
                     f_via     = ui.input(placeholder="Via",      on_change=lambda e: _set_filter("resolved_via",  e.value)).props("dense outlined clearable").style("width:80px").classes("filter-input")
-                    ui.button("Clear", on_click=lambda: _clear_filters()).classes("btn-danger").props("unelevated dense")
+                    ui.button("Clear", on_click=lambda: _clear_filters()).classes("btn-danger").props(
+                        "unelevated dense color=orange-8 text-color=black")
 
             tbl = ui.table(
                 columns=[
                     {"name": "expand",        "label": "",          "field": "expand",        "align": "center",
                      "style": "width:32px"},
                     {"name": "num",           "label": "#",         "field": "num",           "align": "right", "sortable": True,
-                     "style": "width:50px; color:#94a3b8; font-family:monospace; font-weight:700"},
+                     "style": "width:50px; color:#a0a3bd; font-family:monospace; font-weight:700"},
                     {"name": "article",       "label": "Article",   "field": "article",       "align": "left", "sortable": True},
                     {"name": "var_type",      "label": "Var. Type", "field": "var_type",      "align": "left", "sortable": True},
                     {"name": "variable_name", "label": "Variable",  "field": "variable_name", "align": "left", "sortable": True},
@@ -560,16 +586,16 @@ def index_page() -> None:
                                    @click="props.expand = !props.expand" />
                         </template>
                         <template v-else-if="col.name === 'variable_name'">
-                            <span style="cursor:pointer; font-family:monospace; font-weight:600; color:#1e40af; font-size:13px"
+                            <span style="cursor:pointer; font-family:monospace; font-weight:600; color:#4f46e5; font-size:13px"
                                   title="Click to copy"
                                   @click="() => { navigator.clipboard.writeText(props.value);
                                       $q.notify({ message: '$ ' + props.value + ' copied', timeout: 1200,
-                                                  color: 'blue-8', position: 'top-right', icon: 'content_copy' }); }">
+                                                  color: 'indigo-8', position: 'top-right', icon: 'content_copy' }); }">
                                 <span style="opacity:0.4; margin-right:2px">$</span>{{ col.value }}
                             </span>
                         </template>
                         <template v-else-if="col.name === 'value'">
-                            <span style="cursor:pointer; color:#047857; font-family:monospace; font-size:13px"
+                            <span style="cursor:pointer; color:#059669; font-family:monospace; font-size:13px"
                                   title="Click to copy"
                                   @click="() => { navigator.clipboard.writeText(props.value);
                                       $q.notify({ message: 'Copied', timeout: 800, color: 'teal-8',
@@ -583,21 +609,19 @@ def index_page() -> None:
                     </q-td>
                 </q-tr>
                 <q-tr v-if="props.expand" :props="props">
-                    <q-td colspan="100%" style="background:#f8fafc; padding:10px 16px">
-                        <div style="font-size:10px; font-weight:700; color:#1e40af; letter-spacing:0.08em; margin-bottom:4px">
+                    <q-td colspan="100%" style="background:#f7f7fd; padding:10px 16px">
+                        <div style="font-size:10px; font-weight:700; color:#4f46e5; letter-spacing:0.08em; margin-bottom:4px">
                             RESOLUTION PATH
                         </div>
-                        <div style="font-family:monospace; font-size:12px; color:#334155; white-space:pre-wrap; word-break:break-word">
+                        <div style="font-family:monospace; font-size:12px; color:#3d3f57; white-space:pre-wrap; word-break:break-word">
                             {{ props.row.path }}
                         </div>
                     </q-td>
                 </q-tr>
             """)
 
-
-
-            ui.label("💲 Click any Variable or Value cell to copy to clipboard").style(
-                "font-size:11px; color:#94a3b8; margin-top:6px")
+            ui.label("💠 Click any Variable or Value cell to copy to clipboard").style(
+                "font-size:11px; color:#a0a3bd; margin-top:6px")
 
     # ── filter logic (closures over this page's state) ─────────────────────
 
@@ -646,7 +670,7 @@ def index_page() -> None:
 
 def launch() -> None:
     port = _find_free_port(8080)
-    ui.run(title="imos iX Variable Extractor", port=port, reload=False, favicon="💲", show=True)
+    ui.run(title="imos iX Variable Extractor", port=port, reload=False, favicon="💠", show=True)
 
 
 if __name__ in {"__main__", "__mp_main__"}:

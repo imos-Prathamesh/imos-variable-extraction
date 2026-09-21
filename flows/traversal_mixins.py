@@ -146,6 +146,23 @@ class ConnectionTreeMixin:
                     self._classify(val, branch.next_state, path + [f"{branch.label}.{col}={val}"],
                                    branch.match_table, col)
 
+    def _contelem_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_CONTELEM]
+        rows = _fetch_branch(branch, name)
+        _profile_cols = {"PROFILE"}
+        for row in rows:
+            for col in branch.value_columns:
+                val = normalize(row.get(col))
+                if not val:
+                    continue
+                if col in _profile_cols:
+                    self._resolve_then_profil(val, path + [f"contelem.{col}={val}"])
+                else:
+                    self._classify(val, branch.next_state, path + [f"contelem.{col}={val}"], "contelem", col)
+
     def _extrupar_branch(self, name, path):
         if not name:
             return
@@ -161,10 +178,10 @@ class ConnectionTreeMixin:
                 self._resolve_then_render(render, path + [f"extrupar.RENDER={render}"])
             cont = normalize(row.get("CONT"))
             if cont:
-                self._generic_branch(cont, STATE_CONTELEM, path + [f"extrupar.CONT={cont}"])
+                self._contelem_branch(cont, path + [f"extrupar.CONT={cont}"])
             sectname = normalize(row.get("SECTNAME"))
             if sectname:
-                self._generic_branch(sectname, STATE_CONTELEM, path + [f"extrupar.SECTNAME={sectname}"])
+                self._contelem_branch(sectname, path + [f"extrupar.SECTNAME={sectname}"])
             mat = normalize(row.get("MAT"))
             if mat:
                 pv = parse(mat)
@@ -226,7 +243,7 @@ class ConnectionTreeMixin:
                     else:
                         self._resolve_then_profil(prf, grp_path + [f"WORKGROUP.PRF={prf}"])
                 if contour:
-                    self._generic_branch(contour, STATE_CONTELEM, grp_path + [f"WORKGROUP.CONTOUR={contour}"])
+                    self._contelem_branch(contour, grp_path + [f"WORKGROUP.CONTOUR={contour}"])
 
     def _nut_erb_branch(self, name, path):
         if not name:
@@ -353,10 +370,21 @@ class ConnectionTreeMixin:
             self._profil_branch(value, path)
 
     def _profil_branch(self, name, path):
+        state_key = (STATE_PROFIL, name)
+        if state_key in self._active:
+            self.result.cycles.append(f"CYCLE: {' → '.join(path)} → PROFIL({name})")
+            return
+        self._active.add(state_key)
+        try:
+            self._profil_branch_inner(name, path)
+        finally:
+            self._active.discard(state_key)
+
+    def _profil_branch_inner(self, name, path):
         from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_PROFIL]
         rows = _fetch_branch(branch, name)
-        _skip = {"PRFDESCR", "RENDER_PRZ"}
+        _skip = {"PRFDESCR", "RENDER_PRZ", "VPART_MAT"}
         for row in rows:
             for col in branch.value_columns:
                 if col in _skip:
@@ -366,10 +394,17 @@ class ConnectionTreeMixin:
                     self._classify(val, STATE_CONNECTIONS, path + [f"PROFIL.{col}={val}"], "PROFIL", col)
             prfdescr = normalize(row.get("PRFDESCR"))
             if prfdescr:
-                self._generic_branch(prfdescr, STATE_CONTELEM, path + [f"PROFIL.PRFDESCR={prfdescr}"])
+                self._contelem_branch(prfdescr, path + [f"PROFIL.PRFDESCR={prfdescr}"])
             render_prz = normalize(row.get("RENDER_PRZ"))
             if render_prz:
                 self._resolve_then_render(render_prz, path + [f"PROFIL.RENDER_PRZ={render_prz}"])
+            vpart_mat = normalize(row.get("VPART_MAT"))
+            if vpart_mat:
+                pv = parse(vpart_mat)
+                if pv and pv.is_raw:
+                    self._mat_branch(vpart_mat, path + [f"PROFIL.VPART_MAT={vpart_mat}"])
+                else:
+                    self._resolve_then_mat(vpart_mat, path + [f"PROFIL.VPART_MAT={vpart_mat}"])
 
 
 class ImosMixin:

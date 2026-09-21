@@ -135,7 +135,7 @@ BRANCHES: dict[str, Branch] = {
         filter_column="INORDER",
         value_columns=[
             "SPRFTHK", "SPRFDE", "SCOST", "SCFACTOR",
-            "SCPLUSV", "SCPLUSSTAER", "PRFDESCR", "RENDER_PRZ",
+            "SCPLUSV", "SCPLUSSTAER", "PRFDESCR", "RENDER_PRZ", "VPART_MAT",
         ],
         next_state=STATE_CONTELEM,
         order_columns=["THK"],
@@ -173,7 +173,7 @@ BRANCHES: dict[str, Branch] = {
         value_columns=[
             "STARTANGLE", "ENDANGLE", "SSTARTANGL", "SENDANGLE",
             "SENDPOINTX", "SENDPOINTY", "SPOINT2X", "SPOINT2Y",
-            "SLENDIA", "SLENRAD", "SFILLETRAD", "SWIDTH",
+            "SLENDIA", "SLENRAD", "SFILLETRAD", "SWIDTH", "PROFILE",
         ],
         next_state=STATE_TERMINAL,
         order_columns=["ID"],
