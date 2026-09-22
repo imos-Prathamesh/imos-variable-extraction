@@ -419,7 +419,10 @@ def index_page() -> None:
                     lbl_run.style("color:#6b7086").set_text("Loading articles…")
                     try:
                         from core.db import query
-                        rows = query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
+                        rows = query(
+                            "SELECT DISTINCT NAME FROM dbo.articles "
+                            "WHERE NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL ORDER BY NAME"
+                        )
                         names = [r["NAME"] for r in rows if r.get("NAME")]
                         sel_article.options = names
                         sel_article.update()

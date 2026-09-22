@@ -20,6 +20,7 @@ STATE_CONNECTIONS     = "CONNECTIONS"
 STATE_CONNSELTREE     = "CONNSELTREE"
 STATE_CONNDESC        = "CONNDESC"
 STATE_CONNEXTRA       = "CONNEXTRA"
+STATE_CONNSELATTR     = "CONNSELATTR"
 STATE_CONNGROUPS      = "CONNGROUPS"
 STATE_WORKGROUP_PRF   = "WORKGROUP_PRF"
 STATE_WORKGROUP_CONT  = "WORKGROUP_CONTOUR"
@@ -35,6 +36,7 @@ STATE_DESCRIPTOR      = "DESCRIPTOR"
 STATE_IMOS            = "IMOS"
 STATE_MAT             = "MAT"
 STATE_SURF            = "SURF"
+STATE_CONNECTIONSATTR = "CONNECTIONSATTR"
 STATE_TERMINAL        = "TERMINAL"
 
 
@@ -84,7 +86,7 @@ BRANCHES: dict[str, Branch] = {
         match_column="NAME",
         filter_column="INORDER",
         value_columns=["ARTICLE_ID", "ORDER_ID", "SPRICE", "SCFACTOR", "SWEIGHT"],
-        next_state=STATE_CONNECTIONS,
+        next_state=STATE_TERMINAL,
         order_columns=["ORDER_ID"],
     ),
 
@@ -94,8 +96,18 @@ BRANCHES: dict[str, Branch] = {
         match_column="NAME",
         filter_column="INORDER",
         value_columns=["CONNVALUE"],
-        next_state=STATE_CONNECTIONS,
+        next_state=STATE_TERMINAL,
         order_columns=["ATTRIBUTE"],
+    ),
+
+    STATE_CONNSELATTR: Branch(
+        label="CONNSELATTR",
+        match_table="CONNSELATTR",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=["CONNVALUE"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
     ),
 
     STATE_CONNGROUPS: Branch(
@@ -249,6 +261,16 @@ BRANCHES: dict[str, Branch] = {
         ],
         next_state=STATE_CONNECTIONS,   # CONNAME returns to CONNECTIONS
         order_columns=["CHILDNUM"],
+    ),
+
+    STATE_CONNECTIONSATTR: Branch(
+        label="CONNECTIONSATTR",
+        match_table="CONNECTIONSATTR",
+        match_column="SITUNAME",
+        filter_column="INORDER",
+        value_columns=["CONNVALUE"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
     ),
 
     STATE_IDENT: Branch(

@@ -66,20 +66,25 @@ def _fetch_branch(branch: Branch, value: str) -> list[dict]:
     return query(sql, (value,))
 
 
-def _fetch_imos(name: str) -> list[str]:
+def _fetch_imos(name: str) -> list[str] | None:
     rows = query(
         "SELECT WERT FROM dbo.[IMOS] "
         "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(ORDERID)), N'') IS NULL",
         (name,)
     )
-    return [normalize(r["WERT"]) for r in rows if normalize(r["WERT"]) is not None]
+    if not rows:
+        return None
+    return [normalize(r["WERT"]) or "[BLANK]" for r in rows]
 
 
 def _fetch_descriptor(name: str) -> list[str]:
     rows = query(
-        "SELECT LINDIV FROM dbo.[DESCRIPTORVALUES] "
-        "WHERE NAME = ? "
-        "ORDER BY NODENUM, CONDITIONID",
+        "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
+        "WHERE dv.NAME = ? "
+        "  AND EXISTS (SELECT 1 FROM dbo.[DESCRIPTOR] d "
+        "              WHERE d.NAME = dv.NAME "
+        "                AND NULLIF(LTRIM(RTRIM(d.INORDER)), N'') IS NULL) "
+        "ORDER BY dv.NODENUM, dv.CONDITIONID",
         (name,)
     )
     out = []
@@ -135,12 +140,14 @@ class BaseTraversal:
             self._active.add(state_key)
             new_path = path + [f"$IMOS({varname})"]
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", new_path, "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = new_path + [f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._classify(wert, STATE_CONNECTIONS, rec_path, "IMOS", "WERT")
+            else:
+                for wert in wert_values:
+                    rec_path = new_path + [f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._classify(wert, state, rec_path, "IMOS", "WERT")
             self._active.discard(state_key)
 
         for descname in pv.descriptors:
@@ -155,7 +162,7 @@ class BaseTraversal:
             lindiv_values = _fetch_descriptor(descname)
             for lindiv in lindiv_values:
                 rec_path = new_path + [f"LINDIV={lindiv}"]
-                self._classify(lindiv, STATE_CONNECTIONS, rec_path,
+                self._classify(lindiv, state, rec_path,
                                "DESCRIPTORVALUES", "LINDIV")
             self._active.discard(state_key)
 

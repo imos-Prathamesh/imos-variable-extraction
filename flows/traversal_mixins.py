@@ -9,10 +9,11 @@ from __future__ import annotations
 from core.db import query, normalize
 from core.branches import (
     BRANCHES,
-    STATE_CONNECTIONS, STATE_CONNDESC, STATE_CONNEXTRA,
+    STATE_CONNECTIONS, STATE_CONNDESC, STATE_CONNEXTRA, STATE_CONNSELATTR,
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
-    STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF,
+    STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
+    STATE_CONNECTIONSATTR,
 )
 from core.parser import parse
 
@@ -32,6 +33,8 @@ class ConnectionTreeMixin:
             "ORDER BY CONNUM", (value,)
         )
         new_path = path + [f"CONNECTIONS({value})"]
+        if conn_rows:
+            self._generic_branch(value, STATE_CONNECTIONSATTR, new_path)
         for row in conn_rows:
             self._process_connections_row(row, new_path)
         self._active.discard(state_key)
@@ -44,6 +47,8 @@ class ConnectionTreeMixin:
                 "AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL "
                 "ORDER BY COMPONENT, PARENTNUM, CHILDNUM, POSNUM", (conndirect,)
             )
+            if cst_rows:
+                self._generic_branch(conndirect, STATE_CONNSELATTR, path + [f"CONNDIRECT={conndirect}"])
             for r in cst_rows:
                 child = normalize(r.get("CHILDID"))
                 if child:
@@ -56,7 +61,7 @@ class ConnectionTreeMixin:
         for col in ("LINDIV", "LINDIV2", "ROTATION", "POSPART0VAR", "POSPART1VAR", "SNAPRADI", "VARIANT"):
             val = normalize(row.get(col))
             if val:
-                self._classify(val, STATE_CONNECTIONS, path + [f"{col}={val}"], "CONNECTIONS", col)
+                self._classify(val, STATE_TERMINAL, path + [f"{col}={val}"], "CONNECTIONS", col)
 
     def _resolve_then_groove(self, value, path):
         pv = parse(value)
@@ -70,12 +75,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_groove(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_groove(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._nut_erb_branch(value, path)
@@ -94,12 +101,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_render(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_render(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._generic_branch(value, STATE_RENDER, path)
@@ -116,12 +125,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_branch(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_branch(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._direct_sub_branches(value, path)
@@ -146,7 +157,7 @@ class ConnectionTreeMixin:
                     self._classify(val, branch.next_state, path + [f"{branch.label}.{col}={val}"],
                                    branch.match_table, col)
 
-    def _contelem_branch(self, name, path):
+    def _contelem_branch(self, name, path, include_profile=False):
         if not name:
             return
         from core.traversal_base import _fetch_branch
@@ -155,6 +166,8 @@ class ConnectionTreeMixin:
         _profile_cols = {"PROFILE"}
         for row in rows:
             for col in branch.value_columns:
+                if col == "PROFILE" and not include_profile:
+                    continue
                 val = normalize(row.get(col))
                 if not val:
                     continue
@@ -199,12 +212,12 @@ class ConnectionTreeMixin:
             if_folder = normalize(row.get("INFOFOLDER"))
             if if_folder:
                 self._generic_branch(if_folder, STATE_IDENT, path + [f"extrupar.INFOFOLDER={if_folder}"])
-            for col in ("GAP", "ARTIKELNR", "SCFACTOR", "SLWEIGHT", "SAUFMASS",
+            for col in ("GAP", "ORDERID", "ARTIKELNR", "SCFACTOR", "SLWEIGHT", "SAUFMASS",
                         "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN",
                         "TEXT", "TEXT2", "MATOR", "SURFOR"):
                 val = normalize(row.get(col))
                 if val:
-                    self._classify(val, STATE_CONNECTIONS, path + [f"extrupar.{col}={val}"], "extrupar", col)
+                    self._classify(val, STATE_TERMINAL, path + [f"extrupar.{col}={val}"], "extrupar", col)
 
     def _extrucon_branch(self, name, path):
         if not name:
@@ -216,7 +229,8 @@ class ConnectionTreeMixin:
             for col in branch.value_columns:
                 val = normalize(row.get(col))
                 if val:
-                    self._classify(val, STATE_CONNECTIONS, path + [f"extrucon.{col}={val}"], "extrucon", col)
+                    _st = STATE_CONNECTIONS if col == "CONNAME" else STATE_TERMINAL
+                    self._classify(val, _st, path + [f"extrucon.{col}={val}"], "extrucon", col)
 
     def _conngroups_to_workgroup(self, name, path):
         if not name:
@@ -243,7 +257,7 @@ class ConnectionTreeMixin:
                     else:
                         self._resolve_then_profil(prf, grp_path + [f"WORKGROUP.PRF={prf}"])
                 if contour:
-                    self._contelem_branch(contour, grp_path + [f"WORKGROUP.CONTOUR={contour}"])
+                    self._contelem_branch(contour, grp_path + [f"WORKGROUP.CONTOUR={contour}"], include_profile=True)
 
     def _nut_erb_branch(self, name, path):
         if not name:
@@ -274,7 +288,7 @@ class ConnectionTreeMixin:
                     continue
                 val = normalize(row.get(col))
                 if val:
-                    self._classify(val, STATE_CONNECTIONS, path + [f"MAT.{col}={val}"], "MAT", col)
+                    self._classify(val, STATE_TERMINAL, path + [f"MAT.{col}={val}"], "MAT", col)
             render_prz = normalize(row.get("RENDER_PRZ"))
             if render_prz:
                 self._resolve_then_render(render_prz, path + [f"MAT.RENDER_PRZ={render_prz}"])
@@ -291,7 +305,7 @@ class ConnectionTreeMixin:
                     continue
                 val = normalize(row.get(col))
                 if val:
-                    self._classify(val, STATE_CONNECTIONS, path + [f"SURF.{col}={val}"], "SURF", col)
+                    self._classify(val, STATE_TERMINAL, path + [f"SURF.{col}={val}"], "SURF", col)
             render_prz = normalize(row.get("RENDER_PRZ"))
             if render_prz:
                 self._resolve_then_render(render_prz, path + [f"SURF.RENDER_PRZ={render_prz}"])
@@ -315,12 +329,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_mat(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_mat(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._mat_branch(value, path)
@@ -337,12 +353,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_surf(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_surf(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._surf_branch(value, path)
@@ -359,12 +377,14 @@ class ConnectionTreeMixin:
             self._active.add(state_key)
             from core.traversal_base import _fetch_imos
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._resolve_then_profil(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_profil(wert, rec_path)
             self._active.discard(state_key)
         if pv.is_raw:
             self._profil_branch(value, path)
@@ -391,7 +411,7 @@ class ConnectionTreeMixin:
                     continue
                 val = normalize(row.get(col))
                 if val:
-                    self._classify(val, STATE_CONNECTIONS, path + [f"PROFIL.{col}={val}"], "PROFIL", col)
+                    self._classify(val, STATE_TERMINAL, path + [f"PROFIL.{col}={val}"], "PROFIL", col)
             prfdescr = normalize(row.get("PRFDESCR"))
             if prfdescr:
                 self._contelem_branch(prfdescr, path + [f"PROFIL.PRFDESCR={prfdescr}"])
@@ -426,12 +446,14 @@ class ImosMixin:
             self._active.add(state_key)
             new_path = path + [f"$IMOS({varname})"]
             wert_values = _fetch_imos(varname)
-            if not wert_values:
+            if wert_values is None:
                 self._record(varname, "[NOT IN IMOS]", new_path, "IMOS", "WERT", "UNRESOLVED")
-            for wert in wert_values:
-                rec_path = new_path + [f"WERT={wert}"]
-                self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
-                self._classify_imos_loop(wert, rec_path)
+            else:
+                for wert in wert_values:
+                    rec_path = new_path + [f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._classify_imos_loop(wert, rec_path)
             self._active.discard(state_key)
         for descname in pv.descriptors:
             state_key = (STATE_DESCRIPTOR, descname)

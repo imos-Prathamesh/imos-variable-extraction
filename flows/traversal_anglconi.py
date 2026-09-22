@@ -42,7 +42,10 @@ extract = extract_article
 
 def extract_all_articles(max_depth: int = 40) -> list[ExtractionResult]:
     from core.db import query as _query
-    rows = _query("SELECT DISTINCT NAME FROM dbo.articles ORDER BY NAME")
+    rows = _query(
+        "SELECT DISTINCT NAME FROM dbo.articles "
+        "WHERE NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL ORDER BY NAME"
+    )
     results = []
     for row in rows:
         name = normalize(row["NAME"])
