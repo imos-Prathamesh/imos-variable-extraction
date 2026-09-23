@@ -232,6 +232,18 @@ _CSS = """
         color:#000000 !important;
         font-weight:800 !important;
     }
+    .btn-blue {
+        background:#2563eb !important;
+        color:#000000 !important;
+        border-radius:9px !important;
+        font-weight:800 !important;
+        border:1px solid #1e3a8a !important;
+        box-shadow:0 2px 8px rgba(37,99,235,0.4) !important;
+    }
+    .btn-blue .q-btn__content {
+        color:#000000 !important;
+        font-weight:800 !important;
+    }
     .filter-input .q-field__control { background:var(--imos-surface) !important; border-radius:7px !important; }
     .filter-input .q-field__native { font-size:12px !important; color:#3d3f57 !important; }
     .env-badge {
@@ -267,6 +279,10 @@ def index_page() -> None:
         "value": "", "source_table": "", "source_column": "",
         "resolved_via": "", "search": "", "unique": False,
     }
+    _family_state: dict = {
+        "full_tree": [], "expanded": set(), "filters": {},
+        "matches": [], "match_idx": -1, "selected": None,
+    }
 
     # ── header ───────────────────────────────────────────────────────────
     with ui.header().style(
@@ -294,6 +310,7 @@ def index_page() -> None:
         t_settings = ui.tab("⚙  Settings")
         t_run      = ui.tab("▶  Run")
         t_results  = ui.tab("📋  Results")
+        t_family   = ui.tab("🌳  Family Structure")
 
     with ui.tab_panels(tabs, value=t_settings).classes("w-full q-pa-xl"):
 
@@ -495,6 +512,7 @@ def index_page() -> None:
                         _last_run = {"workflow": workflow, "art": art, "all_arts": all_arts, "arts": arts}
                         btn_rerun.set_visibility(True)
                         _apply_filters()
+                        await _rebuild_family_tree()
                         if switch_tab:
                             tabs.set_value(t_results)
                     except Exception as e:
@@ -626,6 +644,32 @@ def index_page() -> None:
             ui.label("💠 Click any Variable or Value cell to copy to clipboard").style(
                 "font-size:11px; color:#a0a3bd; margin-top:6px")
 
+        # ── Family Structure ────────────────────────────────────────────
+        with ui.tab_panel(t_family):
+            with ui.row().classes("items-center justify-between w-full q-mb-sm").style("gap:10px; flex-wrap:wrap"):
+                with ui.row().classes("items-center").style("gap:10px"):
+                    lbl_family_count = ui.label("No data — click Refresh").classes("imos-count-badge")
+                    inp_family_search = ui.input(
+                        placeholder="🔍  Find/Go to…",
+                        on_change=lambda e: _do_search(e.value)
+                    ).props("dense outlined clearable").style("width:420px").classes("filter-input")
+                    ui.button(icon="arrow_upward", on_click=lambda: _go_to_match(-1)).props(
+                        "flat dense round size=sm")
+                    ui.button(icon="arrow_downward", on_click=lambda: _go_to_match(1)).props(
+                        "flat dense round size=sm")
+                    lbl_search_status = ui.label("").style("font-size:12px; font-weight:700; min-width:140px")
+                with ui.row().classes("items-center").style("gap:8px"):
+                    ui.button(icon="unfold_more", on_click=lambda: _expand_all_family()).props(
+                        "flat dense round").tooltip("Expand All")
+                    ui.button(icon="unfold_less", on_click=lambda: _collapse_all_family()).props(
+                        "flat dense round").tooltip("Collapse All")
+                    ui.button("Clear All Filters", on_click=lambda: _clear_all_family_filters()).classes(
+                        "btn-blue").props("unelevated dense")
+                    ui.button("⟳ Refresh", on_click=lambda: on_family_refresh()).classes(
+                        "btn-blue").props("unelevated dense")
+
+            family_container = ui.column().classes("imos-card w-full").style("gap:0; overflow:auto")
+
     # ── filter logic (closures over this page's state) ─────────────────────
 
     def _set_filter(key: str, val) -> None:
@@ -669,6 +713,270 @@ def index_page() -> None:
             w.set_value("")
         chk_unique.set_value(False)
         _apply_filters()
+
+    # ── family tree logic (closures over this page's state) ────────────────
+
+    def _flatten_all(nodes: list) -> list:
+        out = []
+        for n in nodes:
+            out.append(n)
+            out.extend(_flatten_all(n.get("children", [])))
+        return out
+
+    def _col_field(col: str) -> str:
+        return "label" if col == "name" else col
+
+    def _node_matches_filters(n: dict, skip_col: str | None = None) -> bool:
+        for col, allowed in _family_state["filters"].items():
+            if col == skip_col:
+                continue
+            if str(n.get(_col_field(col), "")) not in allowed:
+                return False
+        return True
+
+    def _prune(nodes: list) -> list:
+        out = []
+        for n in nodes:
+            kids = _prune(n.get("children", []))
+            if _node_matches_filters(n) or kids:
+                nn = dict(n)
+                nn["children"] = kids
+                out.append(nn)
+        return out
+
+    def _distinct_values(col: str) -> list:
+        field = _col_field(col)
+        pool = [n for n in _flatten_all(_family_state["full_tree"]) if _node_matches_filters(n, skip_col=col)]
+        vals = {str(n.get(field, "")) for n in pool if str(n.get(field, "")).strip()}
+        return sorted(vals)
+
+    def _clear_all_family_filters() -> None:
+        _family_state["filters"] = {}
+        _render_family_tree()
+
+    def _open_filter_menu(col_key: str) -> None:
+        values = _distinct_values(col_key)
+        current = _family_state["filters"].get(col_key)
+        checked = set(current) if current is not None else set(values)
+        checks: dict[str, object] = {}
+
+        def toggle(v: str, val: bool):
+            if val:
+                checked.add(v)
+            else:
+                checked.discard(v)
+
+        with ui.dialog() as dlg, ui.card().style("min-width:260px"):
+            dlg.props("persistent")
+            ui.label(f"Filter: {col_key}").style("font-weight:700; font-size:13px")
+            box_search = ui.input(placeholder="Search values…").props("dense outlined clearable").classes("w-full q-mt-xs")
+            list_area = ui.column().style("max-height:220px; overflow:auto; gap:2px")
+
+            def render_list(filter_text: str = ""):
+                list_area.clear()
+                checks.clear()
+                ft = filter_text.strip().lower()
+                with list_area:
+                    for v in values:
+                        if ft and ft not in v.lower():
+                            continue
+                        checks[v] = ui.checkbox(v, value=(v in checked),
+                                                 on_change=lambda e, v=v: toggle(v, e.value))
+
+            box_search.on("update:model-value", lambda e: render_list(box_search.value or ""))
+            render_list()
+
+            def select_all():
+                checked.update(values)
+                render_list(box_search.value or "")
+
+            def select_none():
+                checked.clear()
+                render_list(box_search.value or "")
+
+            def apply_and_close():
+                _family_state["filters"][col_key] = set(checked)
+                dlg.close()
+                _render_family_tree()
+
+            def cancel():
+                dlg.close()
+
+            with ui.row().classes("q-mt-sm").style("gap:8px"):
+                ui.button("Select All", on_click=select_all).props("flat dense")
+                ui.button("Clear (Hide All)", on_click=select_none).props("flat dense")
+                ui.button("Cancel", on_click=cancel).props("flat dense")
+                ui.button("Apply", on_click=apply_and_close).classes("btn-orange").props(
+                    "unelevated dense color=orange-8 text-color=black")
+        dlg.open()
+
+    def _col_header(title: str, col_key: str | None, flex: str = "1") -> None:
+        is_active = col_key in _family_state["filters"] if col_key else False
+        with ui.row().classes("items-center").style(
+                f"flex:{flex}; gap:4px; font-size:11px; font-weight:700; color:#3d3f57; "
+                f"text-transform:uppercase; letter-spacing:0.04em"):
+            ui.label(title)
+            if col_key:
+                icon_color = "red-6" if is_active else "grey-7"
+                ui.button(icon="filter_alt", on_click=lambda c=col_key: _open_filter_menu(c)).props(
+                    f"flat dense round size=sm color={icon_color}")
+
+    def _render_header_row() -> None:
+        with ui.row().classes("items-center w-full").style(
+                "padding:8px 10px; gap:0; background:#f7f7fd; border-bottom:2px solid #e4e6f1"):
+            _col_header("Name", "name", flex="2")
+            _col_header("Type", "node_type")
+            _col_header("Default Value", "value")
+            _col_header("Category", "category")
+            _col_header("Comment", "comment")
+
+    def _toggle_node(nid: str) -> None:
+        if nid in _family_state["expanded"]:
+            _family_state["expanded"].discard(nid)
+        else:
+            _family_state["expanded"].add(nid)
+        _render_family_tree()
+
+    def _all_family_ids(nodes: list) -> list:
+        out = []
+        for n in nodes:
+            if n.get("children"):
+                out.append(n["id"])
+                out.extend(_all_family_ids(n["children"]))
+        return out
+
+    def _expand_all_family() -> None:
+        _family_state["expanded"] = set(_all_family_ids(_family_state["full_tree"]))
+        _render_family_tree()
+
+    def _collapse_all_family() -> None:
+        _family_state["expanded"] = set()
+        _render_family_tree()
+
+    _TYPE_ICONS = {
+        "Family": "📁", "Article": "📄", "back": "↩️", "base": "🧱",
+        "Calculation_Principle": "📊", "Color_Principle": "🎨",
+        "Connection_Situation": "🔗", "Connector": "🔌", "Crown_Moulding": "🏛️",
+        "Design_Parameter": "👁️", "Door": "🚪", "Drawer": "🗄️",
+        "Light_Valance": "💡", "Material": "🧩", "Number": "🔢",
+        "Part_Definition": "⚙️", "Profile_Name": "▭", "Pull": "🖐️",
+        "Shelf_Partition": "🗂️", "Side_Panel": "🧱",
+        "Stretchable_Purchase_Part": "📏", "Surface": "🟦", "Text": "🔤",
+        "Work_Surface": "🪵",
+    }
+
+    def _icon_for(node_type: str) -> str:
+        return _TYPE_ICONS.get(node_type, "❔")
+
+    def _render_nodes(nodes: list, depth: int) -> None:
+        for n in nodes:
+            nid = n["id"]
+            is_family = n["node_type"] == "Family"
+            has_children = bool(n.get("children"))
+            expanded = nid in _family_state["expanded"] or bool(_family_state["filters"])
+            selected = (nid == _family_state["selected"])
+            row_style = "padding:6px 10px; border-bottom:1px solid #f0f0f8; cursor:pointer"
+            if selected:
+                row_style += "; background:#eef0ff"
+            with ui.row().classes("items-center w-full").style(row_style):
+                with ui.row().classes("items-center").style(f"flex:2; gap:4px; padding-left:{depth*20}px"):
+                    if has_children:
+                        icon = "expand_more" if expanded else "chevron_right"
+                        ui.button(icon=icon, on_click=lambda nid=nid: _toggle_node(nid)).props(
+                            "flat dense round size=sm")
+                    else:
+                        ui.element("div").style("width:28px")
+                    ui.label(_icon_for(n["node_type"]))
+                    ui.label(n["label"]).style(
+                        "font-family:monospace; font-size:13px" + (";font-weight:700" if is_family else ""))
+                ui.label(n["node_type"]).style("flex:1; font-size:12px; color:#3d3f57")
+                ui.label(n["value"]).style("flex:1; font-size:12px; color:#059669; font-family:monospace")
+                ui.label(n["category"]).style("flex:1; font-size:12px; color:#3d3f57")
+                ui.label(n["comment"]).style("flex:1; font-size:12px; color:#6b7086")
+            if has_children and expanded:
+                _render_nodes(n["children"], depth + 1)
+
+    def _render_family_tree() -> None:
+        family_container.clear()
+        visible = _prune(_family_state["full_tree"])
+        with family_container:
+            _render_header_row()
+            if not visible:
+                ui.label("No data — run an extraction first, then click Refresh").style(
+                    "padding:12px; color:#6b7086; font-size:13px")
+            else:
+                _render_nodes(visible, 0)
+
+    def _expand_path_to(nid: str) -> None:
+        def find_path(nodes, target, trail):
+            for n in nodes:
+                t2 = trail + [n["id"]]
+                if n["id"] == target:
+                    return t2
+                r = find_path(n.get("children", []), target, t2)
+                if r:
+                    return r
+            return None
+        path = find_path(_family_state["full_tree"], nid, [])
+        if path:
+            for pid in path[:-1]:
+                _family_state["expanded"].add(pid)
+
+    def _select_match(idx: int) -> None:
+        matches = _family_state["matches"]
+        _family_state["match_idx"] = idx
+        nid = matches[idx]
+        _family_state["selected"] = nid
+        _expand_path_to(nid)
+        lbl_search_status.style("color:#059669").set_text(f"{idx + 1} / {len(matches)} found")
+        _render_family_tree()
+
+    def _go_to_match(delta: int) -> None:
+        matches = _family_state["matches"]
+        if not matches:
+            return
+        idx = (_family_state["match_idx"] + delta) % len(matches)
+        _select_match(idx)
+
+    def _do_search(text: str) -> None:
+        text = (text or "").strip().lower()
+        _family_state["matches"] = []
+        _family_state["match_idx"] = -1
+        if not text:
+            _family_state["selected"] = None
+            lbl_search_status.set_text("")
+            _render_family_tree()
+            return
+        for n in _flatten_all(_family_state["full_tree"]):
+            if text in n["label"].lower():
+                _family_state["matches"].append(n["id"])
+        if not _family_state["matches"]:
+            _family_state["selected"] = None
+            lbl_search_status.style("color:#e11d48").set_text("No match found")
+            _render_family_tree()
+            return
+        _select_match(0)
+
+    async def _rebuild_family_tree() -> None:
+        from nicegui import run as nicegui_run
+        from core.family_tree import build_family_tree
+        var_names = sorted({r["variable_name"] for r in _all_rows})
+        tree = await nicegui_run.io_bound(build_family_tree, var_names)
+        _family_state["full_tree"] = tree
+        _family_state["expanded"] = set()
+        _family_state["filters"] = {}
+        _family_state["selected"] = None
+        _family_state["matches"] = []
+        _family_state["match_idx"] = -1
+        var_count = sum(1 for n in _flatten_all(tree) if n.get("node_type") != "Family")
+        lbl_family_count.set_text(f"{var_count} variables")
+        _render_family_tree()
+
+    async def on_family_refresh() -> None:
+        if _last_run:
+            await on_rerun()
+        else:
+            await _rebuild_family_tree()
 
 
 def launch() -> None:
