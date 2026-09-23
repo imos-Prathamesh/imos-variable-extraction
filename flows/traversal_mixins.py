@@ -56,14 +56,16 @@ class ConnectionTreeMixin:
                     self._resolve_then_branch(child, child_path)
         groove = normalize(row.get("GROOVE"))
         if groove:
+            tongue_raw = row.get("TONGUE")
+            tongue_equals_one = tongue_raw in (1, True, "1") or normalize(tongue_raw) == "1"
             groove_path = path + [f"GROOVE={groove}"]
-            self._resolve_then_groove(groove, groove_path)
+            self._resolve_then_groove(groove, groove_path, tongue_equals_one=tongue_equals_one)
         for col in ("LINDIV", "LINDIV2", "ROTATION", "POSPART0VAR", "POSPART1VAR", "SNAPRADI", "VARIANT"):
             val = normalize(row.get(col))
             if val:
                 self._classify(val, STATE_TERMINAL, path + [f"{col}={val}"], "CONNECTIONS", col)
 
-    def _resolve_then_groove(self, value, path):
+    def _resolve_then_groove(self, value, path, tongue_equals_one=False):
         pv = parse(value)
         if pv is None:
             return
@@ -82,12 +84,14 @@ class ConnectionTreeMixin:
                     rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
                     self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
                     if wert != "[BLANK]":
-                        self._resolve_then_groove(wert, rec_path)
+                        self._resolve_then_groove(wert, rec_path, tongue_equals_one)
             self._active.discard(state_key)
         if pv.is_raw:
-            self._nut_erb_branch(value, path)
-            self._extrupar_branch(value, path)
-            self._extrucon_branch(value, path)
+            if tongue_equals_one:
+                self._extrupar_branch(value, path)
+                self._extrucon_branch(value, path)
+            else:
+                self._nut_erb_branch(value, path)
 
     def _resolve_then_render(self, value, path):
         pv = parse(value)
