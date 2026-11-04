@@ -56,7 +56,7 @@ def _fetch_branch(branch: Branch, value: str) -> list[dict]:
     order = ""
     if branch.order_columns:
         order = "ORDER BY " + ", ".join(branch.order_columns)
-    cols = ", ".join([branch.match_column] + branch.value_columns)
+    cols = ", ".join(f"[{c}]" for c in [branch.match_column] + branch.value_columns)
     sql = (
         f"SELECT {cols} FROM dbo.[{branch.match_table}] "
         f"WHERE [{branch.match_column}] = ? "

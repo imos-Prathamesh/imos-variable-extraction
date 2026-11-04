@@ -38,6 +38,16 @@ STATE_MAT             = "MAT"
 STATE_SURF            = "SURF"
 STATE_CONNECTIONSATTR = "CONNECTIONSATTR"
 STATE_TERMINAL        = "TERMINAL"
+STATE_ARTCALC         = "ARTCALC"
+STATE_DESIGN          = "DESIGN"
+STATE_LNGSOCKL        = "LNGSOCKL"
+STATE_KMS             = "KMS"
+STATE_KMSPROF         = "KMSPROF"
+STATE_KMSBEARB        = "KMSBEARB"
+STATE_KMSCONNECTIONS  = "KMSCONNECTIONS"
+STATE_MPPCPNTS        = "MPPCPNTS"
+STATE_MPPSUBPA        = "MPPSUBPA"
+STATE_MPPEXTRU        = "MPPEXTRU"
 
 
 @dataclass
@@ -282,6 +292,137 @@ BRANCHES: dict[str, Branch] = {
             "COMMENT", "NCNUMBER", "INFO1", "INFO2", "INFO3", "INFO4", "INFO5",
             "INFO6", "INFO7", "INFO8", "INFO9", "INFO10",
             "SERIALTEXT", "ARTICLE_ID",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_ARTCALC: Branch(
+        label="ARTCALC",
+        match_table="ARTCALC",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=["FORMULA"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_DESIGN: Branch(
+        label="design",
+        match_table="design",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=[
+            "GROOVE",
+            "SSENSRAD", "SMAXLENGAP", "SINSETGAPT", "SINSETGAPB", "SINSETGAPR",
+            "SINSETGAPL", "SINSETGAPI", "SFTOP", "SFBOTTOM", "SFRIGHT", "SFLEFT",
+            "SONSETGAPI", "SONSETLAYT", "SONSETLAYB", "SONSETLAYR", "SONSETLAYL",
+            "SONSETLAYI", "SFCTRHOR", "SFCTRVERT", "SMIDDLGAPI", "SRASTER",
+            "SFRONTDIST", "SBACKDIST", "SSOCKETHGT",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_LNGSOCKL: Branch(
+        label="lngsockl",
+        match_table="lngsockl",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=[
+            "ARTCALC1", "ARTCALC2", "ARTCALC3", "CPINFO",
+            "KMS_PLATTE", "KMS_LEI_VO", "KMS_LEI_HI", "KMS_LEI_RE", "KMS_LEI_LI", "KMS_STZ",
+            "LZ_STZ", "PK_PRINZIP",
+            "SEINR_VO", "SEINR_HI", "SEINR_LI", "SEINR_RE", "SZ_OFFSET",
+            "SDIA_UBS_H", "SDIA_UBS_V", "SDIA_UB_HY", "SDIA_UB_VY", "SEINR_ECK",
+            "SOFFSET_H", "SLEIS_HOEH", "SMIN_LAENG", "SMAX_LAENG", "SOFFST_STZ",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_KMS: Branch(
+        label="KMS",
+        match_table="KMS",
+        match_column="NAME",
+        filter_column="INORDER",
+        value_columns=[
+            "BENDCONT", "PLANNAME", "INFONAME", "MATERIAL", "SURF0", "SURF1",
+            "GRAIN", "GRAINOR", "SUR0_GRNOR", "SUR1_GRNOR",
+            "COLORTOP", "COLORBOTTOM", "SVIRTTHK",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_KMSCONNECTIONS: Branch(
+        label="KMSCONNECTIONS",
+        match_table="KMSCONNECTIONS",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=["CONNECTID"],
+        next_state=STATE_CONNECTIONS,
+        order_columns=[],
+    ),
+
+    STATE_KMSPROF: Branch(
+        label="kmsprof",
+        match_table="kmsprof",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=["CONNECTID", "CONTOUR", "INFONAME", "KMSPRFCOLOR", "MVKPRINZIP", "PROFILE"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_KMSBEARB: Branch(
+        label="kmsbearb",
+        match_table="kmsbearb",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=[
+            "DIAMETER", "WIDTH", "DEEPNES", "OFFSET", "FACTOR", "GRANGLE",
+            "SPLINX", "SPLINY", "SPLINZ", "EPLINX", "EPLINY", "EPLINZ",
+            "DISTANCE", "ANGLE", "SDIAMETER", "SDEEPNES",
+            "SCOUNTERSINK_H", "SCOUNTERSINK_B",
+            "SPARAM_04", "SPARAM_05", "SPARAM_06", "SPARAM_07", "SPARAM_14", "SWIDTH",
+            "TYPE", "NAME",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_MPPCPNTS: Branch(
+        label="mppcpnts",
+        match_table="mppcpnts",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=["LIN_X", "LIN_Y"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_MPPEXTRU: Branch(
+        label="mppextru",
+        match_table="mppextru",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=[
+            "PRINZIP", "ROT", "ZOFFSET", "EGEHRVAL", "SGEHRVAL", "SEGEHRVAL",
+            "SSGEHRVAL", "SZOFFSET", "SROT", "Z_START", "PLUS_THK",
+        ],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
+
+    STATE_MPPSUBPA: Branch(
+        label="mppsubpa",
+        match_table="mppsubpa",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=[
+            "SUBKMS", "CPNUM", "ZOFFSET", "XOR", "ZSIZE", "ROTEDGES",
+            "SZOFFSET", "SZSIZE", "BTSTAERKE", "CUTOUT_WIDTH", "CONTOUR_OFFSET",
         ],
         next_state=STATE_TERMINAL,
         order_columns=[],

@@ -468,3 +468,252 @@ class ImosMixin:
             for lindiv in _fetch_descriptor(descname):
                 self._classify_imos_loop(lindiv, new_path + [f"LINDIV={lindiv}"])
             self._active.discard(state_key)
+
+
+from core.branches import (  # noqa: E402
+    STATE_ARTCALC, STATE_DESIGN, STATE_LNGSOCKL, STATE_KMS, STATE_KMSPROF,
+    STATE_KMSBEARB, STATE_KMSCONNECTIONS, STATE_MPPCPNTS, STATE_MPPSUBPA,
+    STATE_MPPEXTRU,
+)
+
+
+class AnglprimMixin:
+    """anglprim tree: ARTCALC, design, lngsockl, KMS and its sub-tables.
+    List BEFORE ConnectionTreeMixin so the _extrupar_branch override below wins."""
+
+    @staticmethod
+    def _int_in(value, targets):
+        v = normalize(value)
+        if v is None:
+            return False
+        try:
+            return int(float(v)) in targets
+        except ValueError:
+            return False
+
+    def _resolve_then(self, value, path, handler):
+        from core.traversal_base import _fetch_imos
+        pv = parse(value)
+        if pv is None:
+            return
+        for varname in pv.variables:
+            state_key = (STATE_IMOS, varname)
+            if state_key in self._active:
+                self.result.cycles.append(f"CYCLE: {' → '.join(path)} → $IMOS({varname})")
+                continue
+            self._active.add(state_key)
+            wert_values = _fetch_imos(varname)
+            if wert_values is None:
+                self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then(wert, rec_path, handler)
+            self._active.discard(state_key)
+        if pv.is_raw:
+            handler(value, path)
+
+    def _rows(self, state, name):
+        if not name:
+            return []
+        from core.traversal_base import _fetch_branch
+        return _fetch_branch(BRANCHES[state], name)
+
+    def _terminal_cols(self, row, cols, label, path):
+        for col in cols:
+            val = normalize(row.get(col))
+            if val:
+                self._classify(val, STATE_TERMINAL, path + [f"{label}.{col}={val}"], label, col)
+
+    def _spp_branch(self, value, path, with_mat=True):
+        self._extrupar_branch(value, path, with_mat)
+        self._extrucon_branch(value, path)
+
+    def _spp_no_mat(self, value, path):
+        self._spp_branch(value, path, with_mat=False)
+
+    def _extrupar_branch(self, name, path, with_mat=True):
+        for row in self._rows(STATE_EXTRUPAR, name):
+            groove = normalize(row.get("GROOVE"))
+            if groove:
+                self._nut_erb_branch(groove, path + [f"extrupar.GROOVE={groove}"])
+            render = normalize(row.get("RENDER"))
+            if render:
+                self._resolve_then_render(render, path + [f"extrupar.RENDER={render}"])
+            for col in ("CONT", "SECTNAME"):
+                val = normalize(row.get(col))
+                if val:
+                    self._contelem_branch(val, path + [f"extrupar.{col}={val}"])
+            if with_mat:
+                mat = normalize(row.get("MAT"))
+                if mat:
+                    self._resolve_then_mat(mat, path + [f"extrupar.MAT={mat}"])
+                surf = normalize(row.get("SURF"))
+                if surf:
+                    self._resolve_then_surf(surf, path + [f"extrupar.SURF={surf}"])
+            info = normalize(row.get("INFOFOLDER"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"extrupar.INFOFOLDER={info}"])
+            cols = ["GAP", "ORDERID", "ARTIKELNR", "SCFACTOR", "SLWEIGHT", "SAUFMASS",
+                    "SCOST", "SSIZEX", "SSIZEY", "SREFX", "SREFY", "SWALLSTREN"]
+            if with_mat:
+                cols += ["MATOR", "SURFOR"]
+            self._terminal_cols(row, cols, "extrupar", path)
+
+    def _artcalc_branch(self, name, path):
+        for row in self._rows(STATE_ARTCALC, name):
+            self._terminal_cols(row, ["FORMULA"], "ARTCALC", path)
+
+    def _design_branch(self, name, path):
+        for row in self._rows(STATE_DESIGN, name):
+            groove = normalize(row.get("GROOVE"))
+            if groove:
+                self._nut_erb_branch(groove, path + [f"design.GROOVE={groove}"])
+            cols = [c for c in BRANCHES[STATE_DESIGN].value_columns if c != "GROOVE"]
+            self._terminal_cols(row, cols, "design", path)
+
+    def _workgroup_branch(self, name, path):
+        rows = query(
+            "SELECT NAME, PRF, CONTOUR FROM dbo.[WORKGROUP] "
+            "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL", (name,)
+        )
+        for wrow in rows:
+            prf = normalize(wrow.get("PRF"))
+            if prf:
+                self._resolve_then_profil(prf, path + [f"WORKGROUP.PRF={prf}"])
+            contour = normalize(wrow.get("CONTOUR"))
+            if contour:
+                self._contelem_branch(contour, path + [f"WORKGROUP.CONTOUR={contour}"], include_profile=True)
+
+    def _lngsockl_branch(self, name, path):
+        skip = {"ARTCALC1", "ARTCALC2", "ARTCALC3", "CPINFO", "KMS_PLATTE", "KMS_LEI_VO",
+                "KMS_LEI_HI", "KMS_LEI_RE", "KMS_LEI_LI", "KMS_STZ", "PK_PRINZIP"}
+        for row in self._rows(STATE_LNGSOCKL, name):
+            for col in ("ARTCALC1", "ARTCALC2", "ARTCALC3"):
+                val = normalize(row.get(col))
+                if val:
+                    self._artcalc_branch(val, path + [f"lngsockl.{col}={val}"])
+            info = normalize(row.get("CPINFO"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"lngsockl.CPINFO={info}"])
+            for col in ("KMS_PLATTE", "KMS_LEI_VO", "KMS_LEI_HI", "KMS_LEI_RE", "KMS_LEI_LI", "KMS_STZ"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"lngsockl.{col}={val}"], self._kms_branch)
+            prinzip = normalize(row.get("PK_PRINZIP"))
+            if prinzip:
+                self._resolve_then(prinzip, path + [f"lngsockl.PK_PRINZIP={prinzip}"], self._spp_branch)
+            cols = [c for c in BRANCHES[STATE_LNGSOCKL].value_columns if c not in skip]
+            self._terminal_cols(row, cols, "lngsockl", path)
+
+    def _kms_branch(self, name, path):
+        state_key = (STATE_KMS, name)
+        if state_key in self._active:
+            self.result.cycles.append(f"CYCLE: {' → '.join(path)} → KMS({name})")
+            return
+        self._active.add(state_key)
+        try:
+            self._kms_branch_inner(name, path)
+        finally:
+            self._active.discard(state_key)
+
+    def _kms_branch_inner(self, name, path):
+        rows = self._rows(STATE_KMS, name)
+        for row in rows:
+            for col in ("BENDCONT", "PLANNAME"):
+                val = normalize(row.get(col))
+                if val:
+                    self._contelem_branch(val, path + [f"KMS.{col}={val}"])
+            info = normalize(row.get("INFONAME"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"KMS.INFONAME={info}"])
+            mat = normalize(row.get("MATERIAL"))
+            if mat:
+                self._resolve_then_mat(mat, path + [f"KMS.MATERIAL={mat}"])
+            for col in ("SURF0", "SURF1"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then_surf(val, path + [f"KMS.{col}={val}"])
+            self._terminal_cols(
+                row,
+                ["GRAIN", "GRAINOR", "SUR0_GRNOR", "SUR1_GRNOR", "COLORTOP", "COLORBOTTOM", "SVIRTTHK"],
+                "KMS", path,
+            )
+        if rows:
+            self._kmsconnections_branch(name, path)
+            self._kmsprof_branch(name, path)
+            self._kmsbearb_branch(name, path)
+            self._mppcpnts_branch(name, path)
+            self._mppextru_branch(name, path)
+            self._mppsubpa_branch(name, path)
+
+    def _kmsconnections_branch(self, name, path):
+        for row in self._rows(STATE_KMSCONNECTIONS, name):
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"KMSCONNECTIONS.CONNECTID={cid}"],
+                               "KMSCONNECTIONS", "CONNECTID")
+
+    def _kmsprof_branch(self, name, path):
+        for row in self._rows(STATE_KMSPROF, name):
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"kmsprof.CONNECTID={cid}"],
+                               "kmsprof", "CONNECTID")
+            contour = normalize(row.get("CONTOUR"))
+            if contour:
+                self._contelem_branch(contour, path + [f"kmsprof.CONTOUR={contour}"])
+            info = normalize(row.get("INFONAME"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"kmsprof.INFONAME={info}"])
+            color = normalize(row.get("KMSPRFCOLOR"))
+            if color:
+                self._resolve_then_render(color, path + [f"kmsprof.KMSPRFCOLOR={color}"])
+            prinzip = normalize(row.get("MVKPRINZIP"))
+            if prinzip:
+                self._resolve_then(prinzip, path + [f"kmsprof.MVKPRINZIP={prinzip}"], self._spp_branch)
+            profile = normalize(row.get("PROFILE"))
+            if profile:
+                self._resolve_then_profil(profile, path + [f"kmsprof.PROFILE={profile}"])
+
+    def _kmsbearb_branch(self, name, path):
+        for row in self._rows(STATE_KMSBEARB, name):
+            cols = [c for c in BRANCHES[STATE_KMSBEARB].value_columns if c not in ("TYPE", "NAME")]
+            self._terminal_cols(row, cols, "kmsbearb", path)
+            nm = normalize(row.get("NAME"))
+            if not nm:
+                continue
+            npath = path + [f"kmsbearb.NAME={nm}"]
+            typ = row.get("TYPE")
+            if self._int_in(typ, (4,)):
+                self._workgroup_branch(nm, npath)
+            elif self._int_in(typ, (1, 2, 3, 5, 6, 7)):
+                self._resolve_then_profil(nm, npath)
+            elif self._int_in(typ, (10,)):
+                self._contelem_branch(nm, npath, include_profile=True)
+
+    def _mppcpnts_branch(self, name, path):
+        for row in self._rows(STATE_MPPCPNTS, name):
+            self._terminal_cols(row, ["LIN_X", "LIN_Y"], "mppcpnts", path)
+
+    def _mppextru_branch(self, name, path):
+        for row in self._rows(STATE_MPPEXTRU, name):
+            prinzip = normalize(row.get("PRINZIP"))
+            if prinzip:
+                self._resolve_then(prinzip, path + [f"mppextru.PRINZIP={prinzip}"], self._spp_branch)
+            cols = [c for c in BRANCHES[STATE_MPPEXTRU].value_columns if c != "PRINZIP"]
+            self._terminal_cols(row, cols, "mppextru", path)
+
+    def _mppsubpa_branch(self, name, path):
+        for row in self._rows(STATE_MPPSUBPA, name):
+            sub = normalize(row.get("SUBKMS"))
+            if sub:
+                spath = path + [f"mppsubpa.SUBKMS={sub}"]
+                if self._int_in(row.get("CPNUM"), (3,)):
+                    self._resolve_then_surf(sub, spath)
+                else:
+                    self._resolve_then(sub, spath, self._kms_branch)
+            cols = [c for c in BRANCHES[STATE_MPPSUBPA].value_columns if c not in ("SUBKMS", "CPNUM")]
+            self._terminal_cols(row, cols, "mppsubpa", path)
