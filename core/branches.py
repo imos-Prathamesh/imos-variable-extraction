@@ -12,7 +12,7 @@ Each Branch describes exactly one table in the flow:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 
 STATE_CONISITU        = "CONISITU"
@@ -48,6 +48,10 @@ STATE_KMSCONNECTIONS  = "KMSCONNECTIONS"
 STATE_MPPCPNTS        = "MPPCPNTS"
 STATE_MPPSUBPA        = "MPPSUBPA"
 STATE_MPPEXTRU        = "MPPEXTRU"
+STATE_LNGARBPL        = "LNGARBPL"
+STATE_LNGLICHL        = "LNGLICHL"
+STATE_LNGKRANL        = "LNGKRANL"
+STATE_MPPSPNTS        = "MPPSPNTS"
 
 
 @dataclass
@@ -421,10 +425,28 @@ BRANCHES: dict[str, Branch] = {
         match_column="KMSNAME",
         filter_column="INORDER",
         value_columns=[
-            "SUBKMS", "CPNUM", "ZOFFSET", "XOR", "ZSIZE", "ROTEDGES",
+            "SUBKMS", "CPNUM", "SINGLE_LAYER_PART", "ZOFFSET", "XOR", "ZSIZE", "ROTEDGES",
             "SZOFFSET", "SZSIZE", "BTSTAERKE", "CUTOUT_WIDTH", "CONTOUR_OFFSET",
         ],
         next_state=STATE_TERMINAL,
         order_columns=[],
     ),
+
+    STATE_MPPSPNTS: Branch(
+        label="mppspnts",
+        match_table="mppspnts",
+        match_column="KMSNAME",
+        filter_column="INORDER",
+        value_columns=["DISTANCE", "OFFSET"],
+        next_state=STATE_TERMINAL,
+        order_columns=[],
+    ),
 }
+
+# lngarbpl / lnglichl / lngkranl have exactly the same columns as lngsockl
+for _state, _table in (
+    (STATE_LNGARBPL, "lngarbpl"),
+    (STATE_LNGLICHL, "lnglichl"),
+    (STATE_LNGKRANL, "lngkranl"),
+):
+    BRANCHES[_state] = replace(BRANCHES[STATE_LNGSOCKL], label=_table, match_table=_table)

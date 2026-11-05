@@ -473,7 +473,7 @@ class ImosMixin:
 from core.branches import (  # noqa: E402
     STATE_ARTCALC, STATE_DESIGN, STATE_LNGSOCKL, STATE_KMS, STATE_KMSPROF,
     STATE_KMSBEARB, STATE_KMSCONNECTIONS, STATE_MPPCPNTS, STATE_MPPSUBPA,
-    STATE_MPPEXTRU,
+    STATE_MPPEXTRU, STATE_MPPSPNTS,
 )
 
 
@@ -488,6 +488,18 @@ class AnglprimMixin:
             return False
         try:
             return int(float(v)) in targets
+        except ValueError:
+            return False
+
+    @staticmethod
+    def _num_gt(value, limit):
+        if isinstance(value, bool):
+            return int(value) > limit
+        v = normalize(value)
+        if v is None:
+            return False
+        try:
+            return float(v) > limit
         except ValueError:
             return False
 
@@ -588,25 +600,29 @@ class AnglprimMixin:
                 self._contelem_branch(contour, path + [f"WORKGROUP.CONTOUR={contour}"], include_profile=True)
 
     def _lngsockl_branch(self, name, path):
+        self._lng_branch(name, path, STATE_LNGSOCKL)
+
+    def _lng_branch(self, name, path, state):
+        label = BRANCHES[state].match_table
         skip = {"ARTCALC1", "ARTCALC2", "ARTCALC3", "CPINFO", "KMS_PLATTE", "KMS_LEI_VO",
                 "KMS_LEI_HI", "KMS_LEI_RE", "KMS_LEI_LI", "KMS_STZ", "PK_PRINZIP"}
-        for row in self._rows(STATE_LNGSOCKL, name):
+        for row in self._rows(state, name):
             for col in ("ARTCALC1", "ARTCALC2", "ARTCALC3"):
                 val = normalize(row.get(col))
                 if val:
-                    self._artcalc_branch(val, path + [f"lngsockl.{col}={val}"])
+                    self._artcalc_branch(val, path + [f"{label}.{col}={val}"])
             info = normalize(row.get("CPINFO"))
             if info:
-                self._generic_branch(info, STATE_IDENT, path + [f"lngsockl.CPINFO={info}"])
+                self._generic_branch(info, STATE_IDENT, path + [f"{label}.CPINFO={info}"])
             for col in ("KMS_PLATTE", "KMS_LEI_VO", "KMS_LEI_HI", "KMS_LEI_RE", "KMS_LEI_LI", "KMS_STZ"):
                 val = normalize(row.get(col))
                 if val:
-                    self._resolve_then(val, path + [f"lngsockl.{col}={val}"], self._kms_branch)
+                    self._resolve_then(val, path + [f"{label}.{col}={val}"], self._kms_branch)
             prinzip = normalize(row.get("PK_PRINZIP"))
             if prinzip:
-                self._resolve_then(prinzip, path + [f"lngsockl.PK_PRINZIP={prinzip}"], self._spp_branch)
-            cols = [c for c in BRANCHES[STATE_LNGSOCKL].value_columns if c not in skip]
-            self._terminal_cols(row, cols, "lngsockl", path)
+                self._resolve_then(prinzip, path + [f"{label}.PK_PRINZIP={prinzip}"], self._spp_branch)
+            cols = [c for c in BRANCHES[state].value_columns if c not in skip]
+            self._terminal_cols(row, cols, label, path)
 
     def _kms_branch(self, name, path):
         state_key = (STATE_KMS, name)
@@ -646,6 +662,7 @@ class AnglprimMixin:
             self._kmsprof_branch(name, path)
             self._kmsbearb_branch(name, path)
             self._mppcpnts_branch(name, path)
+            self._mppspnts_branch(name, path)
             self._mppextru_branch(name, path)
             self._mppsubpa_branch(name, path)
 
@@ -698,6 +715,10 @@ class AnglprimMixin:
         for row in self._rows(STATE_MPPCPNTS, name):
             self._terminal_cols(row, ["LIN_X", "LIN_Y"], "mppcpnts", path)
 
+    def _mppspnts_branch(self, name, path):
+        for row in self._rows(STATE_MPPSPNTS, name):
+            self._terminal_cols(row, ["DISTANCE", "OFFSET"], "mppspnts", path)
+
     def _mppextru_branch(self, name, path):
         for row in self._rows(STATE_MPPEXTRU, name):
             prinzip = normalize(row.get("PRINZIP"))
@@ -711,9 +732,53 @@ class AnglprimMixin:
             sub = normalize(row.get("SUBKMS"))
             if sub:
                 spath = path + [f"mppsubpa.SUBKMS={sub}"]
-                if self._int_in(row.get("CPNUM"), (3,)):
+                if self._int_in(row.get("CPNUM"), (3,)) or self._num_gt(row.get("SINGLE_LAYER_PART"), 0):
                     self._resolve_then_surf(sub, spath)
                 else:
                     self._resolve_then(sub, spath, self._kms_branch)
-            cols = [c for c in BRANCHES[STATE_MPPSUBPA].value_columns if c not in ("SUBKMS", "CPNUM")]
+            cols = [c for c in BRANCHES[STATE_MPPSUBPA].value_columns
+                    if c not in ("SUBKMS", "CPNUM", "SINGLE_LAYER_PART")]
             self._terminal_cols(row, cols, "mppsubpa", path)
+
+
+class ArticleCategoryMixin:
+    """articles → ARTICLECATEGORY → ARTICLECATEGORYATTRVALUE branches.
+    Use together with AnglprimMixin (needs _resolve_then and _lng_branch)."""
+
+    def _run_article_category(self, attr_name, lng_state):
+        rows = query(
+            "SELECT a.ARTICLECATEGORY_NAME FROM dbo.articles a "
+            "WHERE a.NAME = ? "
+            "  AND NULLIF(LTRIM(RTRIM(a.INORDER)), N'') IS NULL",
+            (self.article,)
+        )
+        base = [f"articles({self.article})"]
+        for row in rows:
+            cat = normalize(row.get("ARTICLECATEGORY_NAME"))
+            if cat:
+                self._attr_value_branch(
+                    cat, base + [f"articles.ARTICLECATEGORY_NAME={cat}"], attr_name, lng_state)
+                continue
+            for drow in query("SELECT ARTICLECATEGORY_NAME FROM dbo.ARTICLECATEGORY WHERE IS_DEFAULT = 1"):
+                dcat = normalize(drow.get("ARTICLECATEGORY_NAME"))
+                if dcat:
+                    self._attr_value_branch(
+                        dcat, base + [f"ARTICLECATEGORY.ARTICLECATEGORY_NAME={dcat}"], attr_name, lng_state)
+
+    def _attr_values(self, category, name):
+        rows = query(
+            "SELECT [VALUE] FROM dbo.ARTICLECATEGORYATTRVALUE "
+            "WHERE ARTICLECATEGORY_NAME = ? AND NAME = ?",
+            (category, name)
+        )
+        return [v for v in (normalize(r.get("VALUE")) for r in rows) if v]
+
+    def _attr_value_branch(self, category, path, attr_name, lng_state):
+        for val in self._attr_values(category, "EinfuegeHoehe"):
+            self._classify(val, STATE_TERMINAL, path + [f"ARTICLECATEGORYATTRVALUE.VALUE={val}"],
+                           "ARTICLECATEGORYATTRVALUE", "VALUE")
+        for val in self._attr_values(category, attr_name):
+            self._resolve_then(
+                val, path + [f"ARTICLECATEGORYATTRVALUE.VALUE={val}"],
+                lambda v, p: self._lng_branch(v, p, lng_state),
+            )
