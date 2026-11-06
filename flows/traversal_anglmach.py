@@ -1,19 +1,26 @@
 # Source : flows/traversal_anglmach.py
-# Analogy: New flow entry point — starts from ANGLMACH.ANGLNAME, extracts SDIAMETER/SDEEPNES directly and routes NAME into the existing PROFIL resolution chain.
-"""anglmach flow: articles.NAME → ANGLMACH.ANGLNAME → SDIAMETER/SDEEPNES + PROFIL"""
+# Analogy: Flow entry point — starts from ANGLMACH.ANGLNAME, extracts the value columns and routes NAME into PROFIL (or WORKGROUP when TYPE=4 and ZETYPE<>Z).
+"""anglmach flow: articles.NAME → ANGLMACH.ANGLNAME → value columns + NAME → PROFIL / WORKGROUP"""
 from __future__ import annotations
 
 from core.db import query, normalize
 from core.traversal_base import BaseTraversal, ExtractionResult
-from flows.traversal_mixins import ConnectionTreeMixin
-from core.branches import STATE_TERMINAL
+from flows.traversal_mixins import AnglprimMixin, ConnectionTreeMixin
+
+_VALUE_COLS = [
+    "DIAMETER", "WIDTH", "DEEPNES", "OFFSET", "FACTOR", "ENDFORM", "GRANGLE", "ZEICHN",
+    "SPLINX", "SPLINY", "SPLINZ", "EPLINX", "EPLINY", "EPLINZ", "DISTANCE", "ANGLE",
+    "SDIAMETER", "SDEEPNES", "COUNTERSINK_H", "COUNTERSINK_B",
+    "SCOUNTERSINK_H", "SCOUNTERSINK_B", "SWIDTH",
+]
 
 
-class TraversalAnglmach(ConnectionTreeMixin, BaseTraversal):
+class TraversalAnglmach(AnglprimMixin, ConnectionTreeMixin, BaseTraversal):
 
     def run(self) -> ExtractionResult:
+        select_cols = ", ".join(f"am.[{c}]" for c in ["NAME", "ZETYPE", "TYPE"] + _VALUE_COLS)
         rows = query(
-            "SELECT am.ANGLNAME, am.SDIAMETER, am.SDEEPNES, am.NAME "
+            f"SELECT am.ANGLNAME, {select_cols} "
             "FROM dbo.articles a "
             "JOIN dbo.ANGLMACH am "
             "  ON am.ANGLNAME = a.NAME COLLATE Latin1_General_CI_AS "
@@ -24,13 +31,21 @@ class TraversalAnglmach(ConnectionTreeMixin, BaseTraversal):
         )
         for row in rows:
             path = [f"ANGLMACH({self.article})"]
-            for col in ("SDIAMETER", "SDEEPNES"):
-                val = normalize(row.get(col))
-                if val:
-                    self._classify(val, STATE_TERMINAL, path + [f"ANGLMACH.{col}={val}"], "ANGLMACH", col)
+            self._terminal_cols(row, _VALUE_COLS, "ANGLMACH", path)
             nm = normalize(row.get("NAME"))
-            if nm:
-                self._resolve_then_profil(nm, path + [f"ANGLMACH.NAME={nm}"])
+            if not nm:
+                continue
+            npath = path + [f"ANGLMACH.NAME={nm}"]
+            is_z = (normalize(row.get("ZETYPE")) or "").upper() == "Z"
+            typ = row.get("TYPE")
+            if is_z:
+                self._resolve_then_profil(nm, npath)
+            elif self._int_in(typ, (4,)):
+                self._workgroup_branch(nm, npath)
+            else:
+                self._resolve_then_profil(nm, npath)
+                if self._int_in(typ, (10,)):
+                    self._contelem_branch(nm, npath, include_profile=True)
         return self.result
 
 
