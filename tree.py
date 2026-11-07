@@ -1,3 +1,4 @@
+#This file is to get tree structure of project
 import os
 
 SKIP_DIRS = {
