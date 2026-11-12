@@ -32,6 +32,20 @@ TYP_LABELS: dict[str, str] = {
     "3":  "Surface",        "120":"Text",                  "36": "Work_Surface",
 }
 
+# (key, label, width %, sortable, filterable) — shared by custom header and table columns
+_RES_COLS: list[tuple] = [
+    ("expand",        "",          4,  False, False),
+    ("num",           "#",         5,  False, False),
+    ("article",       "Article",   13, True,  True),
+    ("var_type",      "Var. Type", 10, True,  True),
+    ("variable_name", "Variable",  18, True,  True),
+    ("value",         "Value",     13, True,  True),
+    ("origin",        "Origin",    15, True,  True),
+    ("source_table",  "Table",     7,  True,  True),
+    ("source_column", "Column",    8,  True,  True),
+    ("resolved_via",  "Via",       7,  True,  True),
+]
+
 def _load_cfg() -> dict:
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
@@ -67,11 +81,11 @@ def _workflow_options() -> list[str]:
         return [ALL_FLOWS_LABEL]
     return names + [ALL_FLOWS_LABEL]
 
-def _run_flow(workflow: str, article: str | None, all_arts: bool,
+def _run_flow(workflows: list[str], article: str | None, all_arts: bool,
                articles: list[str] | None = None) -> list:
     from core.flow_registry import get_registry
     registry = get_registry()
-    selected = list(registry.keys()) if workflow == ALL_FLOWS_LABEL else [workflow]
+    selected = list(registry.keys()) if ALL_FLOWS_LABEL in workflows else workflows
     out = []
     for wf in selected:
         info = registry.get(wf)
@@ -206,17 +220,11 @@ _CSS = """
         font-weight:800 !important;
     }
     .imos-table { background:var(--imos-surface) !important; border-radius:12px !important; border:1px solid var(--imos-border) !important; overflow:hidden !important; }
-    .imos-table .q-table thead tr th {
-        background:linear-gradient(180deg, #f7f7fd, #f0f0fa) !important;
-        color:#3d3f57 !important;
-        font-weight:700 !important;
-        font-size:12px !important;
-        letter-spacing:0.05em !important;
-        text-transform:uppercase !important;
-        border-bottom:2px solid var(--imos-border) !important;
-        padding:10px 12px !important;
+    .imos-table .q-table { table-layout:fixed !important; width:100% !important; }
+    .imos-table .q-table tbody tr td {
+        color:var(--imos-text) !important; font-size:13px !important; padding:8px 12px !important;
+        overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     }
-    .imos-table .q-table tbody tr td { color:var(--imos-text) !important; font-size:13px !important; padding:8px 12px !important; }
     .imos-table .q-table tbody tr { border-bottom:1px solid #f0f0f8 !important; }
     .imos-table .q-table tbody tr:hover td { background:#eef0ff !important; }
     .btn-primary, .btn-orange, .btn-secondary, .btn-danger {
@@ -279,6 +287,8 @@ def index_page() -> None:
         "value": "", "source_table": "", "source_column": "",
         "resolved_via": "", "search": "", "unique": False,
     }
+    _results_filters: dict = {}
+    _results_sort: dict = {"col": None, "desc": False}
     _family_state: dict = {
         "full_tree": [], "expanded": set(), "filters": {},
         "matches": [], "match_idx": -1, "selected": None,
@@ -425,6 +435,10 @@ def index_page() -> None:
                 chk_all   = ui.checkbox("All Articles").classes("q-mt-xs")
                 sel_workflow = ui.select(_workflow_options(), label="Workflow",
                                          value=ALL_FLOWS_LABEL).classes("w-full q-mt-sm")
+                sel_workflow_multi = ui.select(_workflow_options(), label="Workflows", multiple=True,
+                                               with_input=True).classes("w-full q-mt-sm").props("use-chips")
+                sel_workflow_multi.set_visibility(False)
+                chk_multi_wf = ui.checkbox("Multiple Workflows").classes("q-mt-xs")
                 lbl_run      = ui.label("").style("font-size:12px; color:#6b7086; min-height:18px")
 
                 _articles_loaded = {"done": False}
@@ -478,13 +492,29 @@ def index_page() -> None:
                 chk_multi.on("update:modelValue", on_toggle_multi)
                 chk_all.on("update:modelValue", on_toggle_all)
 
+                def _refresh_workflow_visibility():
+                    if chk_multi_wf.value:
+                        sel_workflow.set_visibility(False)
+                        sel_workflow_multi.set_visibility(True)
+                    else:
+                        sel_workflow.set_visibility(True)
+                        sel_workflow_multi.set_visibility(False)
+                    sel_workflow.update()
+                    sel_workflow_multi.update()
+
+                chk_multi_wf.on("update:modelValue", lambda e: _refresh_workflow_visibility())
+
                 def on_refresh_flows():
                     from core.flow_registry import reset_registry
                     reset_registry()
-                    sel_workflow.options = _workflow_options()
+                    opts = _workflow_options()
+                    sel_workflow.options = opts
                     sel_workflow.update()
+                    sel_workflow_multi.options = opts
+                    sel_workflow_multi.update()
 
                 sel_workflow.on("popup-show", lambda: on_refresh_flows())
+                sel_workflow_multi.on("popup-show", lambda: on_refresh_flows())
 
                 prog_run = ui.linear_progress(value=0, show_value=False).classes("q-mt-sm")
                 prog_run.style(
@@ -492,7 +522,7 @@ def index_page() -> None:
                     "--q-primary:#f59e0b; background:#fde7c2")
                 prog_run.set_visibility(False)
 
-                async def _execute_run(workflow, art, all_arts, arts, switch_tab: bool):
+                async def _execute_run(workflows, art, all_arts, arts, switch_tab: bool):
                     nonlocal _all_rows, _last_run
                     from nicegui import run as nicegui_run
 
@@ -503,14 +533,23 @@ def index_page() -> None:
                         0.08 if prog_run.value >= 0.9 else prog_run.value + 0.08))
                     try:
                         occ       = await nicegui_run.io_bound(
-                            _run_flow, workflow, art, all_arts, arts)
+                            _run_flow, workflows, art, all_arts, arts)
                         var_names = list({o.variable_name for o in occ})
                         typ_map   = await nicegui_run.io_bound(_fetch_typ_map, var_names)
                         _all_rows = _build_rows(occ, typ_map)
                         prog_run.set_value(1.0)
                         lbl_run.style("color:#059669").set_text(f"✓ {len(_all_rows)} occurrences found")
-                        _last_run = {"workflow": workflow, "art": art, "all_arts": all_arts, "arts": arts}
+                        _last_run = {"workflows": workflows, "art": art, "all_arts": all_arts, "arts": arts}
                         btn_rerun.set_visibility(True)
+                        if ALL_FLOWS_LABEL in workflows:
+                            flow_text = "Flow: All Flows"
+                        elif len(workflows) == 1:
+                            flow_text = f"Flow: {workflows[0]}"
+                        else:
+                            flow_text = f"Flows: {', '.join(workflows)}"
+                        lbl_flow_indicator.set_text(flow_text)
+                        _results_filters.clear()
+                        _render_results_header()
                         _apply_filters()
                         await _rebuild_family_tree()
                         if switch_tab:
@@ -537,12 +576,20 @@ def index_page() -> None:
                             lbl_run.style("color:#b45309").set_text("⚠ Select an article or check All Articles")
                             return
 
-                    await _execute_run(sel_workflow.value, art, chk_all.value, arts, switch_tab=True)
+                    if chk_multi_wf.value:
+                        workflows = sel_workflow_multi.value or []
+                        if not workflows:
+                            lbl_run.style("color:#b45309").set_text("⚠ Select at least one workflow")
+                            return
+                    else:
+                        workflows = [sel_workflow.value]
+
+                    await _execute_run(workflows, art, chk_all.value, arts, switch_tab=True)
 
                 async def on_rerun():
                     if not _last_run:
                         return
-                    await _execute_run(_last_run["workflow"], _last_run["art"],
+                    await _execute_run(_last_run["workflows"], _last_run["art"],
                                         _last_run["all_arts"], _last_run["arts"], switch_tab=False)
 
                 with ui.row().classes("q-mt-md").style("gap:8px"):
@@ -562,6 +609,8 @@ def index_page() -> None:
                 inp_search = ui.input(placeholder="🔍  Search variable name…",
                                       on_change=lambda e: _set_filter("search", e.value)
                                       ).props("dense outlined clearable").style("width:260px").classes("filter-input")
+                ui.space()
+                lbl_flow_indicator = ui.label("Flow: —").classes("imos-header-badge")
 
             with ui.element("div").classes("imos-card q-pa-sm q-mb-sm"):
                 with ui.row().classes("items-center").style("gap:6px; flex-wrap:wrap"):
@@ -578,25 +627,25 @@ def index_page() -> None:
                     ui.button("Clear", on_click=lambda: _clear_filters()).classes("btn-danger").props(
                         "unelevated dense color=orange-8 text-color=black")
 
+            # custom header row (native NiceGUI buttons → reliable click handling)
+            results_header = ui.row().classes("w-full no-wrap").style(
+                "gap:0; background:linear-gradient(180deg,#f7f7fd,#f0f0fa); "
+                "border:1px solid #e4e6f1; border-bottom:2px solid #e4e6f1; "
+                "border-radius:12px 12px 0 0; box-sizing:border-box")
+
             tbl = ui.table(
                 columns=[
-                    {"name": "expand",        "label": "",          "field": "expand",        "align": "center",
-                     "style": "width:32px"},
-                    {"name": "num",           "label": "#",         "field": "num",           "align": "right", "sortable": True,
-                     "style": "width:50px; color:#a0a3bd; font-family:monospace; font-weight:700"},
-                    {"name": "article",       "label": "Article",   "field": "article",       "align": "left", "sortable": True},
-                    {"name": "var_type",      "label": "Var. Type", "field": "var_type",      "align": "left", "sortable": True},
-                    {"name": "variable_name", "label": "Variable",  "field": "variable_name", "align": "left", "sortable": True},
-                    {"name": "value",         "label": "Value",     "field": "value",         "align": "left", "sortable": True},
-                    {"name": "origin",        "label": "Origin",    "field": "origin",        "align": "left", "sortable": True},
-                    {"name": "source_table",  "label": "Table",     "field": "source_table",  "align": "left", "sortable": True},
-                    {"name": "source_column", "label": "Column",    "field": "source_column", "align": "left", "sortable": True},
-                    {"name": "resolved_via",  "label": "Via",       "field": "resolved_via",  "align": "left", "sortable": True},
+                    {"name": key, "label": label, "field": key,
+                     "align": "right" if key == "num" else ("center" if key == "expand" else "left"),
+                     "style": f"width:{width}%"
+                              + ("; color:#a0a3bd; font-family:monospace; font-weight:700" if key == "num" else "")}
+                    for key, label, width, _s, _f in _RES_COLS
                 ],
                 rows=[],
                 row_key="num",
                 pagination={"rowsPerPage": 100},
-            ).classes("imos-table w-full").props("dense flat virtual-scroll")
+            ).classes("imos-table w-full").props("dense flat hide-header").style(
+                "border-top:none !important; border-radius:0 0 12px 12px !important")
 
             tbl.add_slot("body", """
                 <q-tr :props="props">
@@ -670,7 +719,7 @@ def index_page() -> None:
 
             family_container = ui.column().classes("imos-card w-full").style("gap:0; overflow:auto")
 
-    # ── filter logic (closures over this page's state) ─────────────────────
+    # ── results filter / sort logic (closures over this page's state) ──────
 
     def _set_filter(key: str, val) -> None:
         _filters[key] = (val or "").strip().lower() if isinstance(val, str) else bool(val)
@@ -697,6 +746,14 @@ def index_page() -> None:
             if v:
                 rows = [r for r in rows if v in str(r.get(field, "")).lower()]
 
+        for col, allowed in _results_filters.items():
+            rows = [r for r in rows if str(r.get(col, "")) in allowed]
+
+        sort_col = _results_sort["col"]
+        if sort_col:
+            rows = sorted(rows, key=lambda r: str(r.get(sort_col, "")).lower(),
+                          reverse=_results_sort["desc"])
+
         for i, r in enumerate(rows):
             rows[i] = {**r, "num": i + 1}
 
@@ -712,7 +769,123 @@ def index_page() -> None:
         for w in (f_article, f_vartype, f_varname, f_value, f_table, f_col, f_via, inp_search):
             w.set_value("")
         chk_unique.set_value(False)
+        _results_filters.clear()
+        _results_sort["col"] = None
+        _results_sort["desc"] = False
+        _render_results_header()
         _apply_filters()
+
+    def _results_distinct_values(col: str, skip: str | None = None) -> list:
+        pool = list(_all_rows)
+        for c, allowed in _results_filters.items():
+            if c == skip:
+                continue
+            pool = [r for r in pool if str(r.get(c, "")) in allowed]
+        return sorted({str(r.get(col, "")) for r in pool})
+
+    def _active_filter_cols() -> set:
+        active = set()
+        for c, allowed in _results_filters.items():
+            if set(allowed) != set(_results_distinct_values(c, skip=c)):
+                active.add(c)
+        return active
+
+    def _toggle_results_sort(col_key: str) -> None:
+        if _results_sort["col"] != col_key:
+            _results_sort["col"] = col_key
+            _results_sort["desc"] = False
+        elif not _results_sort["desc"]:
+            _results_sort["desc"] = True
+        else:
+            _results_sort["col"] = None
+            _results_sort["desc"] = False
+        _render_results_header()
+        _apply_filters()
+
+    def _render_results_header() -> None:
+        results_header.clear()
+        active = _active_filter_cols()
+        with results_header:
+            for key, label, width, sortable, filterable in _RES_COLS:
+                justify = "flex-end" if key == "num" else "flex-start"
+                with ui.row().classes("items-center no-wrap").style(
+                        f"width:{width}%; padding:8px 12px; gap:2px; box-sizing:border-box; "
+                        f"justify-content:{justify}; overflow:hidden"):
+                    ui.label(label).style(
+                        "font-size:12px; font-weight:700; color:#3d3f57; "
+                        "text-transform:uppercase; letter-spacing:0.05em; white-space:nowrap")
+                    if sortable:
+                        if _results_sort["col"] == key:
+                            s_icon = "arrow_downward" if _results_sort["desc"] else "arrow_upward"
+                            s_color = "indigo-8"
+                        else:
+                            s_icon = "unfold_more"
+                            s_color = "grey-6"
+                        ui.button(icon=s_icon, on_click=lambda k=key: _toggle_results_sort(k)).props(
+                            f"flat dense round size=xs color={s_color}")
+                    if filterable:
+                        f_color = "red-6" if key in active else "grey-7"
+                        ui.button(icon="filter_alt", on_click=lambda k=key: _open_results_filter_menu(k)).props(
+                            f"flat dense round size=xs color={f_color}")
+
+    def _open_results_filter_menu(col_key: str) -> None:
+        values = _results_distinct_values(col_key, skip=col_key)
+        current = _results_filters.get(col_key)
+        checked = set(current) if current is not None else set(values)
+        checks: dict[str, object] = {}
+        col_label = next((c[1] for c in _RES_COLS if c[0] == col_key), col_key)
+
+        def toggle(v: str, val: bool):
+            if val:
+                checked.add(v)
+            else:
+                checked.discard(v)
+
+        with ui.dialog() as dlg, ui.card().style("min-width:280px"):
+            dlg.props("persistent")
+            ui.label(f"Filter: {col_label}").style("font-weight:700; font-size:13px")
+            box_search = ui.input(placeholder="Search values…").props("dense outlined clearable").classes("w-full q-mt-xs")
+            list_area = ui.column().style("max-height:260px; overflow:auto; gap:2px")
+
+            def render_list(filter_text: str = ""):
+                list_area.clear()
+                checks.clear()
+                ft = (filter_text or "").strip().lower()
+                with list_area:
+                    for v in values:
+                        shown = v if v else "(blank)"
+                        if ft and ft not in shown.lower():
+                            continue
+                        checks[v] = ui.checkbox(shown, value=(v in checked),
+                                                 on_change=lambda e, v=v: toggle(v, e.value))
+
+            box_search.on("update:model-value", lambda e: render_list(box_search.value or ""))
+            render_list()
+
+            def select_all():
+                checked.update(values)
+                render_list(box_search.value or "")
+
+            def select_none():
+                checked.clear()
+                render_list(box_search.value or "")
+
+            def apply_and_close():
+                _results_filters[col_key] = set(checked)
+                dlg.close()
+                _render_results_header()
+                _apply_filters()
+
+            def cancel():
+                dlg.close()
+
+            with ui.row().classes("q-mt-sm").style("gap:8px"):
+                ui.button("Select All", on_click=select_all).props("flat dense")
+                ui.button("Clear (Hide All)", on_click=select_none).props("flat dense")
+                ui.button("Cancel", on_click=cancel).props("flat dense")
+                ui.button("Apply", on_click=apply_and_close).classes("btn-orange").props(
+                    "unelevated dense color=orange-8 text-color=black")
+        dlg.open()
 
     # ── family tree logic (closures over this page's state) ────────────────
 
@@ -977,6 +1150,8 @@ def index_page() -> None:
             await on_rerun()
         else:
             await _rebuild_family_tree()
+
+    _render_results_header()
 
 
 def launch() -> None:
