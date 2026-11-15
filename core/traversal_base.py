@@ -18,6 +18,7 @@ from core.branches import (
     STATE_PROFIL, STATE_PROFIL_GEOM, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_DESCRIPTOR, STATE_IMOS, STATE_TERMINAL,
+    STATE_ANGLELFR_CP,
     Branch,
 )
 
@@ -171,6 +172,9 @@ class BaseTraversal:
                 self._enter_connections(value, path, source_table, source_column)
             elif state == STATE_TERMINAL:
                 pass
+            elif state == STATE_ANGLELFR_CP:
+                self._blende_branch(value, path)
+                self._cpconnlist_branch(value, path)
             else:
                 branch = BRANCHES.get(state)
                 if branch is not None:

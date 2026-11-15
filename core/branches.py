@@ -52,6 +52,8 @@ STATE_LNGARBPL        = "LNGARBPL"
 STATE_LNGLICHL        = "LNGLICHL"
 STATE_LNGKRANL        = "LNGKRANL"
 STATE_MPPSPNTS        = "MPPSPNTS"
+STATE_BLENDE          = "BLENDE"
+STATE_ANGLELFR_CP     = "ANGLELFR_CP"
 
 
 @dataclass
@@ -450,3 +452,13 @@ for _state, _table in (
     (STATE_LNGKRANL, "lngkranl"),
 ):
     BRANCHES[_state] = replace(BRANCHES[STATE_LNGSOCKL], label=_table, match_table=_table)
+
+BRANCHES[STATE_BLENDE] = Branch(
+    label="BLENDE",
+    match_table="BLENDE",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["SBREITE", "SUEBERST_O", "SUEBERST_U", "SEINRUECKG", "SUEBERST_F", "CPINFO", "KMS"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)

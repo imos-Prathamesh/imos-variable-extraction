@@ -13,7 +13,7 @@ from core.branches import (
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
-    STATE_CONNECTIONSATTR,
+    STATE_CONNECTIONSATTR, STATE_BLENDE,
 )
 from core.parser import parse
 
@@ -739,6 +739,37 @@ class AnglprimMixin:
             cols = [c for c in BRANCHES[STATE_MPPSUBPA].value_columns
                     if c not in ("SUBKMS", "CPNUM", "SINGLE_LAYER_PART")]
             self._terminal_cols(row, cols, "mppsubpa", path)
+
+    def _blende_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_BLENDE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in ("SBREITE", "SUEBERST_O", "SUEBERST_U", "SEINRUECKG", "SUEBERST_F"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"BLENDE.{col}={val}"], "BLENDE", col)
+            info = normalize(row.get("CPINFO"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"BLENDE.CPINFO={info}"])
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"BLENDE.KMS={kms}"], self._kms_branch)
+
+    def _cpconnlist_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT CONNECTID FROM dbo.[CPCONNLIST] WHERE NAME = ?",
+            (name,)
+        )
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
+                               "CPCONNLIST", "CONNECTID")
 
 
 class ArticleCategoryMixin:
