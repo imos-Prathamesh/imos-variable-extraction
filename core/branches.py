@@ -54,6 +54,7 @@ STATE_LNGKRANL        = "LNGKRANL"
 STATE_MPPSPNTS        = "MPPSPNTS"
 STATE_BLENDE          = "BLENDE"
 STATE_ANGLELFR_CP     = "ANGLELFR_CP"
+STATE_CSIDE           = "CSIDE"
 
 
 @dataclass
@@ -459,6 +460,21 @@ BRANCHES[STATE_BLENDE] = Branch(
     match_column="NAME",
     filter_column="INORDER",
     value_columns=["SBREITE", "SUEBERST_O", "SUEBERST_U", "SEINRUECKG", "SUEBERST_F", "CPINFO", "KMS"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_CSIDE] = Branch(
+    label="CSIDE",
+    match_table="CSIDE",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=[
+        "MDRFLAG", "DISTFRONT", "DISTBACK", "DISTSTART", "DIAMETER", "DEPTH",
+        "CCHEIGTH", "CCDEPTH", "CCRADIUS", "LT_VER", "SRASTER", "SDISTFRONT",
+        "SDISTBACK", "SDISTSEND", "SDIAMETER", "SDEPTH", "SWGTYPE", "SMACHCLASS",
+        "CPINFO", "KMS",
+    ],
     next_state=STATE_TERMINAL,
     order_columns=[],
 )

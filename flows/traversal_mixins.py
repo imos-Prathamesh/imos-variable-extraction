@@ -13,7 +13,7 @@ from core.branches import (
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
-    STATE_CONNECTIONSATTR, STATE_BLENDE,
+    STATE_CONNECTIONSATTR, STATE_BLENDE, STATE_CSIDE,
 )
 from core.parser import parse
 
@@ -770,6 +770,29 @@ class AnglprimMixin:
             if cid:
                 self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
                                "CPCONNLIST", "CONNECTID")
+
+    def _cside_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_CSIDE]
+        rows = _fetch_branch(branch, name)
+        _plain_cols = [
+            "MDRFLAG", "DISTFRONT", "DISTBACK", "DISTSTART", "DIAMETER", "DEPTH",
+            "CCHEIGTH", "CCDEPTH", "CCRADIUS", "LT_VER", "SRASTER", "SDISTFRONT",
+            "SDISTBACK", "SDISTSEND", "SDIAMETER", "SDEPTH", "SWGTYPE", "SMACHCLASS",
+        ]
+        for row in rows:
+            for col in _plain_cols:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"CSIDE.{col}={val}"], "CSIDE", col)
+            info = normalize(row.get("CPINFO"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"CSIDE.CPINFO={info}"])
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"CSIDE.KMS={kms}"], self._kms_branch)
 
 
 class ArticleCategoryMixin:
