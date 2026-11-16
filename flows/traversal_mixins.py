@@ -13,7 +13,7 @@ from core.branches import (
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
-    STATE_CONNECTIONSATTR, STATE_BLENDE, STATE_CSIDE,
+    STATE_CONNECTIONSATTR, STATE_BLENDE, STATE_CSIDE, STATE_CABBACK,
 )
 from core.parser import parse
 
@@ -771,6 +771,19 @@ class AnglprimMixin:
                 self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
                                "CPCONNLIST", "CONNECTID")
 
+    def _cpconnlist_branch_type4(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT CONNECTID FROM dbo.[CPCONNLIST] WHERE NAME = ? AND TYPE = 4",
+            (name,)
+        )
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
+                               "CPCONNLIST", "CONNECTID")
+
     def _cside_branch(self, name, path):
         if not name:
             return
@@ -793,6 +806,35 @@ class AnglprimMixin:
             kms = normalize(row.get("KMS"))
             if kms:
                 self._resolve_then(kms, path + [f"CSIDE.KMS={kms}"], self._kms_branch)
+
+    def _cabback_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_CABBACK]
+        rows = _fetch_branch(branch, name)
+        _plain_cols = [
+            "CONDIST", "NUTUSTLAEN", "NUTUSTL_KR", "NUTUSTL_UB", "NUTUSTL_OB",
+            "NUTUSTQUER", "NUTUSTTIEF", "FLNUT_AUS", "FLNUT_A_KR", "FLNUT_A_UB",
+            "FLNUT_A_OB", "FLVERB_KS", "FLVERB_BOD", "FLNUT_TDEF", "DISTUP",
+            "DISTLR", "THKINCLDED", "CONDSTART", "CONDEND", "RGRDEL", "RGRDER",
+            "RGRDET", "RGRDEB", "SRGRDEL", "SRGRDER", "SRGRDET", "SRGRDEB",
+            "SDISTLR", "SCONDIST", "SCONDSTART", "SCONDEND",
+        ]
+        for row in rows:
+            for col in _plain_cols:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"CABBACK.{col}={val}"], "CABBACK", col)
+            info = normalize(row.get("CPINFO"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"CABBACK.CPINFO={info}"])
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"CABBACK.KMS={kms}"], self._kms_branch)
+            nut = normalize(row.get("NUT_ERB"))
+            if nut:
+                self._nut_erb_branch(nut, path + [f"CABBACK.NUT_ERB={nut}"])
 
 
 class ArticleCategoryMixin:

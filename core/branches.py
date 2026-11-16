@@ -55,6 +55,7 @@ STATE_MPPSPNTS        = "MPPSPNTS"
 STATE_BLENDE          = "BLENDE"
 STATE_ANGLELFR_CP     = "ANGLELFR_CP"
 STATE_CSIDE           = "CSIDE"
+STATE_CABBACK         = "CABBACK"
 
 
 @dataclass
@@ -474,6 +475,24 @@ BRANCHES[STATE_CSIDE] = Branch(
         "CCHEIGTH", "CCDEPTH", "CCRADIUS", "LT_VER", "SRASTER", "SDISTFRONT",
         "SDISTBACK", "SDISTSEND", "SDIAMETER", "SDEPTH", "SWGTYPE", "SMACHCLASS",
         "CPINFO", "KMS",
+    ],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_CABBACK] = Branch(
+    label="CABBACK",
+    match_table="CABBACK",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=[
+        "CONDIST", "NUTUSTLAEN", "NUTUSTL_KR", "NUTUSTL_UB", "NUTUSTL_OB",
+        "NUTUSTQUER", "NUTUSTTIEF", "FLNUT_AUS", "FLNUT_A_KR", "FLNUT_A_UB",
+        "FLNUT_A_OB", "FLVERB_KS", "FLVERB_BOD", "FLNUT_TDEF", "DISTUP",
+        "DISTLR", "THKINCLDED", "CONDSTART", "CONDEND", "RGRDEL", "RGRDER",
+        "RGRDET", "RGRDEB", "SRGRDEL", "SRGRDER", "SRGRDET", "SRGRDEB",
+        "SDISTLR", "SCONDIST", "SCONDSTART", "SCONDEND",
+        "CPINFO", "KMS", "NUT_ERB",
     ],
     next_state=STATE_TERMINAL,
     order_columns=[],

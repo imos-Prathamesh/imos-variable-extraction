@@ -18,7 +18,7 @@ from core.branches import (
     STATE_PROFIL, STATE_PROFIL_GEOM, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_DESCRIPTOR, STATE_IMOS, STATE_TERMINAL,
-    STATE_ANGLELFR_CP, STATE_CSIDE,
+    STATE_ANGLELFR_CP, STATE_CSIDE, STATE_CABBACK,
     Branch,
 )
 
@@ -177,6 +177,9 @@ class BaseTraversal:
                 self._cpconnlist_branch(value, path)
             elif state == STATE_CSIDE:
                 self._cside_branch(value, path)
+            elif state == STATE_CABBACK:
+                self._cabback_branch(value, path)
+                self._cpconnlist_branch_type4(value, path)
             else:
                 branch = BRANCHES.get(state)
                 if branch is not None:
