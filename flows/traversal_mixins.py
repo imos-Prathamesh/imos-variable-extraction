@@ -1022,6 +1022,76 @@ class AnglprimMixin:
                 self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
                                "CPCONNLIST", "CONNECTID")
 
+    def _imosdoorsinfo_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINFO, STATE_IMOSDOORSINGLE
+        branch = BRANCHES[STATE_IMOSDOORSINFO]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("TYPE"), (0,)):
+                continue
+
+            if self._int_in(row.get("LANECHANGING"), (1,)):
+                val = normalize(row.get("MIDDLEGAP2"))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.MIDDLEGAP2={val}"],
+                                   "IMOSDOORSINFO", "MIDDLEGAP2")
+
+            if self._int_in(row.get("FRONTABW"), (0,)):
+                for col in ("SABSTANDOBEN", "SABSTANDUNTEN", "SABSTANDLINKS", "SABSTANDRECHTS"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                       "IMOSDOORSINFO", col)
+
+            for col in ("SEINRUECKUNG1", "SEINRUECKUNG2", "SUEBERLAPPUNG"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            frontaufteilung = normalize(row.get("FRONTAUFTEILUNG"))
+            if frontaufteilung:
+                self._classify(frontaufteilung, STATE_TERMINAL, path + [f"IMOSDOORSINFO.FRONTAUFTEILUNG={frontaufteilung}"],
+                               "IMOSDOORSINFO", "FRONTAUFTEILUNG")
+
+            if self._int_in(row.get("KONSTRART"), (2,)):
+                for col in ("SBLENDEHOEHE", "SBLENDEEINR", "SBLENDEUEBERSTOBEN",
+                            "SBLENDEUEBERSTLINKS", "SBLENDEUEBERSTRECHTS"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                       "IMOSDOORSINFO", col)
+                blendekms = normalize(row.get("BLENDEKMS"))
+                if blendekms:
+                    self._resolve_then(blendekms, path + [f"IMOSDOORSINFO.BLENDEKMS={blendekms}"], self._kms_branch)
+
+            for col in ("SITUNAMEOBEN", "SITUNAMEUNTEN"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            self._imosdoorsingle_branch(name, path)
+
+    def _imosdoorsingle_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINGLE
+        branch = BRANCHES[STATE_IMOSDOORSINGLE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            btausp = normalize(row.get("BTAUSP"))
+            if btausp:
+                self._resolve_then(btausp, path + [f"IMOSDOORSINGLE.BTAUSP={btausp}"], self._kms_branch)
+            for col in ("SITUNAMEGRIFF", "SITUNAMEGRIFF1", "SITUNAMEGRIFF2"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return
