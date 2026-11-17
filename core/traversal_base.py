@@ -20,6 +20,7 @@ from core.branches import (
     STATE_IDENT, STATE_DESCRIPTOR, STATE_IMOS, STATE_TERMINAL,
     STATE_ANGLELFR_CP, STATE_CSIDE, STATE_CABBACK,
     STATE_DOOR, STATE_DOORSING, STATE_GRIFF, STATE_PULLHEIGHT,
+    STATE_DOOR_FLAP,
     Branch,
 )
 
@@ -202,6 +203,8 @@ class BaseTraversal:
                 self._cpconnlist_branch_type4(value, path)
             elif state == STATE_DOOR:
                 self._door_branch(value, path)
+            elif state == STATE_DOOR_FLAP:
+                self._door_branch_flap(value, path)
             elif state == STATE_DOORSING:
                 self._doorsing_branch(value, path)
             elif state == STATE_GRIFF:

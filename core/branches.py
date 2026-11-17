@@ -60,6 +60,7 @@ STATE_DOOR            = "DOOR"
 STATE_DOORSING        = "DOORSING"
 STATE_GRIFF           = "GRIFF"
 STATE_PULLHEIGHT      = "PULLHEIGHT"
+STATE_DOOR_FLAP       = "DOOR_FLAP"
 
 
 @dataclass
@@ -534,4 +535,9 @@ BRANCHES[STATE_GRIFF] = Branch(
     value_columns=["CONNECTID", "PULLHEIGHT"],
     next_state=STATE_TERMINAL,
     order_columns=[],
+)
+
+BRANCHES[STATE_DOOR_FLAP] = replace(
+    BRANCHES[STATE_DOOR],
+    value_columns=BRANCHES[STATE_DOOR].value_columns + ["TUER_R"],
 )
