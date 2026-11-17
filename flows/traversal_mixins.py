@@ -945,6 +945,83 @@ class AnglprimMixin:
                     self._classify(tuer_r, STATE_DOORSING, path + [f"DOOR.TUER_R={tuer_r}"], "DOOR", "TUER_R")
                 self._cpconnprim_gated_cpconnlist_branch(name, path)
 
+    def _door_branch_double(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_DOOR_DOUBLE
+        branch = BRANCHES[STATE_DOOR_DOUBLE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in ("SFRONTDIS", "SFRONTDISR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DOOR.{col}={val}"], "DOOR", col)
+
+            if self._int_in(row.get("FR_ABW_AKT"), (0,)):
+                for col in ("DISTC", "DISTJ", "DISTUP", "DISTDN",
+                            "SDISTC", "SDISTJ", "SDISTUP", "SDISTDN", "FUGE2_FORM"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DOOR.{col}={val}"], "DOOR", col)
+
+            if self._int_in(row.get("NOD"), (2,)) and self._int_in(row.get("DJOIN"), (1,)):
+                nut = normalize(row.get("NUT_ERB"))
+                if nut:
+                    self._nut_erb_branch(nut, path + [f"DOOR.NUT_ERB={nut}"])
+
+                tuer_l = normalize(row.get("TUER_L"))
+                if tuer_l:
+                    self._classify(tuer_l, STATE_DOORSING, path + [f"DOOR.TUER_L={tuer_l}"], "DOOR", "TUER_L")
+                tuer_r = normalize(row.get("TUER_R"))
+                if tuer_r:
+                    self._classify(tuer_r, STATE_DOORSING, path + [f"DOOR.TUER_R={tuer_r}"], "DOOR", "TUER_R")
+
+                if self._int_in(row.get("SEP_INFOLR"), (1,)):
+                    info = normalize(row.get("CPINFO"))
+                    if info:
+                        self._generic_branch(info, STATE_IDENT, path + [f"DOOR.CPINFO={info}"])
+                    infor = normalize(row.get("CPINFOR"))
+                    if infor:
+                        self._generic_branch(infor, STATE_IDENT, path + [f"DOOR.CPINFOR={infor}"])
+                else:
+                    info = normalize(row.get("CPINFO"))
+                    if info:
+                        self._generic_branch(info, STATE_IDENT, path + [f"DOOR.CPINFO={info}"])
+
+                sl_kms = normalize(row.get("SL_KMS"))
+                if sl_kms:
+                    for col in ("SL_TIEFENV", "SL_SAUFLAG", "SL_SBREITE", "SL_SABOBEN", "SL_SABUNT"):
+                        val = normalize(row.get(col))
+                        if val:
+                            self._classify(val, STATE_TERMINAL, path + [f"DOOR.{col}={val}"], "DOOR", col)
+                    self._resolve_then(sl_kms, path + [f"DOOR.SL_KMS={sl_kms}"], self._kms_branch)
+                    groove = normalize(row.get("GROOVE"))
+                    if groove:
+                        self._nut_erb_branch(groove, path + [f"DOOR.GROOVE={groove}"])
+
+                self._door_double_cpconnprim_branch(name, path)
+
+    def _door_double_cpconnprim_branch(self, name, path):
+        prim_rows = query(
+            "SELECT ONLYONECON FROM dbo.[CPCONNPRIM] WHERE NAME = ? AND TYPE = 4",
+            (name,)
+        )
+        if not prim_rows:
+            return
+
+        connnums = (0,) if self._int_in(prim_rows[0].get("ONLYONECON"), (1,)) else (0, 1)
+        rows = query(
+            "SELECT CONNECTID FROM dbo.[CPCONNLIST] "
+            "WHERE NAME = ? AND TYPE = 4 AND CONNNUM IN (" + ",".join("?" * len(connnums)) + ")",
+            (name, *connnums)
+        )
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
+                               "CPCONNLIST", "CONNECTID")
+
     def _doorsing_branch(self, name, path):
         if not name:
             return

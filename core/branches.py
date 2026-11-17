@@ -61,6 +61,7 @@ STATE_DOORSING        = "DOORSING"
 STATE_GRIFF           = "GRIFF"
 STATE_PULLHEIGHT      = "PULLHEIGHT"
 STATE_DOOR_FLAP       = "DOOR_FLAP"
+STATE_DOOR_DOUBLE     = "DOOR_DOUBLE"
 
 
 @dataclass
@@ -540,4 +541,13 @@ BRANCHES[STATE_GRIFF] = Branch(
 BRANCHES[STATE_DOOR_FLAP] = replace(
     BRANCHES[STATE_DOOR],
     value_columns=BRANCHES[STATE_DOOR].value_columns + ["TUER_R"],
+)
+
+BRANCHES[STATE_DOOR_DOUBLE] = replace(
+    BRANCHES[STATE_DOOR],
+    value_columns=BRANCHES[STATE_DOOR].value_columns + [
+        "TUER_R", "SEP_INFOLR", "CPINFOR", "FUGE2_FORM",
+        "SL_KMS", "SL_TIEFENV", "SL_SAUFLAG", "SL_SBREITE", "SL_SABOBEN", "SL_SABUNT",
+        "GROOVE",
+    ],
 )
