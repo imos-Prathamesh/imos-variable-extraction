@@ -14,6 +14,7 @@ from core.branches import (
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
     STATE_CONNECTIONSATTR, STATE_BLENDE, STATE_CSIDE, STATE_CABBACK,
+    STATE_DOOR, STATE_DOORSING, STATE_GRIFF, STATE_PULLHEIGHT,
 )
 from core.parser import parse
 
@@ -835,6 +836,112 @@ class AnglprimMixin:
             nut = normalize(row.get("NUT_ERB"))
             if nut:
                 self._nut_erb_branch(nut, path + [f"CABBACK.NUT_ERB={nut}"])
+
+    def _cpconnlist_branch_connnum0_type4(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT CONNECTID FROM dbo.[CPCONNLIST] WHERE NAME = ? AND CONNNUM = 0 AND TYPE = 4",
+            (name,)
+        )
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"CPCONNLIST.CONNECTID={cid}"],
+                               "CPCONNLIST", "CONNECTID")
+
+    def _door_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_DOOR]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in ("SFRONTDIS", "SFRONTDISR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DOOR.{col}={val}"], "DOOR", col)
+
+            if self._int_in(row.get("FR_ABW_AKT"), (0,)):
+                for col in ("DISTC", "DISTJ", "DISTUP", "DISTDN",
+                            "SDISTC", "SDISTJ", "SDISTUP", "SDISTDN"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DOOR.{col}={val}"], "DOOR", col)
+
+            if self._int_in(row.get("NOD"), (1,)) and self._int_in(row.get("DJOIN"), (1,)):
+                info = normalize(row.get("CPINFO"))
+                if info:
+                    self._generic_branch(info, STATE_IDENT, path + [f"DOOR.CPINFO={info}"])
+                nut = normalize(row.get("NUT_ERB"))
+                if nut:
+                    self._nut_erb_branch(nut, path + [f"DOOR.NUT_ERB={nut}"])
+                tuer = normalize(row.get("TUER_L"))
+                if tuer:
+                    self._classify(tuer, STATE_DOORSING, path + [f"DOOR.TUER_L={tuer}"], "DOOR", "TUER_L")
+                self._cpconnlist_branch_connnum0_type4(name, path)
+
+    def _doorsing_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_DOORSING]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            altlin = normalize(row.get("ALTLIN_BUFFER"))
+            if altlin:
+                self._classify(altlin, STATE_TERMINAL, path + [f"DOORSING.ALTLIN_BUFFER={altlin}"],
+                               "DOORSING", "ALTLIN_BUFFER")
+            for col in ("GRIFF_MITT", "GRIFF_L", "GRIFF_R"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_GRIFF, path + [f"DOORSING.{col}={val}"], "DOORSING", col)
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"DOORSING.KMS={kms}"], self._kms_branch)
+
+    def _griff_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        branch = BRANCHES[STATE_GRIFF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._classify(cid, STATE_CONNECTIONS, path + [f"GRIFF.CONNECTID={cid}"], "GRIFF", "CONNECTID")
+            ph = normalize(row.get("PULLHEIGHT"))
+            if ph:
+                self._classify(ph, STATE_PULLHEIGHT, path + [f"GRIFF.PULLHEIGHT={ph}"], "GRIFF", "PULLHEIGHT")
+
+    def _pullheight_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT PHTYPE, PHVALUE FROM dbo.[PULLHEIGHT] WHERE NAME = ?",
+            (name,)
+        )
+        by_type = {}
+        for row in rows:
+            t = (normalize(row.get("PHTYPE")) or "").upper()
+            if t:
+                by_type[t] = row
+
+        height_row = by_type.get("HEIGHT")
+        if height_row:
+            val = normalize(height_row.get("PHVALUE"))
+            if val:
+                self._classify(val, STATE_TERMINAL, path + [f"PULLHEIGHT.PHVALUE={val}"], "PULLHEIGHT", "PHVALUE")
+
+        activate_row = by_type.get("ACTIVATE")
+        if activate_row and normalize(activate_row.get("PHVALUE")) == "1":
+            for t in ("DIST_BOT", "DIST_TOP", "SNAPRADIUS"):
+                row = by_type.get(t)
+                if row:
+                    val = normalize(row.get("PHVALUE"))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"PULLHEIGHT.PHVALUE={val}"],
+                                       "PULLHEIGHT", "PHVALUE")
 
 
 class ArticleCategoryMixin:

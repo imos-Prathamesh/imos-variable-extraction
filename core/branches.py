@@ -56,6 +56,10 @@ STATE_BLENDE          = "BLENDE"
 STATE_ANGLELFR_CP     = "ANGLELFR_CP"
 STATE_CSIDE           = "CSIDE"
 STATE_CABBACK         = "CABBACK"
+STATE_DOOR            = "DOOR"
+STATE_DOORSING        = "DOORSING"
+STATE_GRIFF           = "GRIFF"
+STATE_PULLHEIGHT      = "PULLHEIGHT"
 
 
 @dataclass
@@ -494,6 +498,40 @@ BRANCHES[STATE_CABBACK] = Branch(
         "SDISTLR", "SCONDIST", "SCONDSTART", "SCONDEND",
         "CPINFO", "KMS", "NUT_ERB",
     ],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_DOOR] = Branch(
+    label="DOOR",
+    match_table="DOOR",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=[
+        "NOD", "DJOIN", "FR_ABW_AKT", "SFRONTDIS", "SFRONTDISR",
+        "CPINFO", "NUT_ERB", "TUER_L",
+        "DISTC", "DISTJ", "DISTUP", "DISTDN", "SDISTC", "SDISTJ", "SDISTUP", "SDISTDN",
+    ],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_DOORSING] = Branch(
+    label="DOORSING",
+    match_table="DOORSING",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["ALTLIN_BUFFER", "GRIFF_MITT", "GRIFF_L", "GRIFF_R", "KMS"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_GRIFF] = Branch(
+    label="GRIFF",
+    match_table="GRIFF",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["CONNECTID", "PULLHEIGHT"],
     next_state=STATE_TERMINAL,
     order_columns=[],
 )

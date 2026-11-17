@@ -19,6 +19,7 @@ from core.branches import (
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
     STATE_IDENT, STATE_DESCRIPTOR, STATE_IMOS, STATE_TERMINAL,
     STATE_ANGLELFR_CP, STATE_CSIDE, STATE_CABBACK,
+    STATE_DOOR, STATE_DOORSING, STATE_GRIFF, STATE_PULLHEIGHT,
     Branch,
 )
 
@@ -79,15 +80,34 @@ def _fetch_imos(name: str) -> list[str] | None:
 
 
 def _fetch_descriptor(name: str) -> list[str]:
-    rows = query(
-        "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
-        "WHERE dv.NAME = ? "
-        "  AND EXISTS (SELECT 1 FROM dbo.[DESCRIPTOR] d "
-        "              WHERE d.NAME = dv.NAME "
-        "                AND NULLIF(LTRIM(RTRIM(d.INORDER)), N'') IS NULL) "
-        "ORDER BY dv.NODENUM, dv.CONDITIONID",
+    desc_rows = query(
+        "SELECT DESC_TYPE FROM dbo.[DESCRIPTOR] "
+        "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
         (name,)
     )
+    if not desc_rows:
+        return []
+
+    try:
+        is_type_11 = int(desc_rows[0].get("DESC_TYPE")) == 11
+    except (TypeError, ValueError):
+        is_type_11 = False
+
+    if is_type_11:
+        rows = query(
+            "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
+            "WHERE dv.NAME = ? "
+            "ORDER BY dv.NODENUM, dv.CONDITIONID",
+            (name,)
+        )
+    else:
+        rows = query(
+            "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
+            "WHERE dv.NAME = ? AND dv.COMMENT = 'DEFAULT' "
+            "ORDER BY dv.NODENUM, dv.CONDITIONID",
+            (name,)
+        )
+
     out = []
     for r in rows:
         v = normalize(r["LINDIV"])
@@ -180,6 +200,14 @@ class BaseTraversal:
             elif state == STATE_CABBACK:
                 self._cabback_branch(value, path)
                 self._cpconnlist_branch_type4(value, path)
+            elif state == STATE_DOOR:
+                self._door_branch(value, path)
+            elif state == STATE_DOORSING:
+                self._doorsing_branch(value, path)
+            elif state == STATE_GRIFF:
+                self._griff_branch(value, path)
+            elif state == STATE_PULLHEIGHT:
+                self._pullheight_branch(value, path)
             else:
                 branch = BRANCHES.get(state)
                 if branch is not None:
