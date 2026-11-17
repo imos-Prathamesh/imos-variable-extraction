@@ -19,6 +19,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 CONFIG_FILE = ROOT / "config.json"
+RUN_STATE_FILE = ROOT / "run_state.json"
 
 APP_VERSION = "v1.1"
 ALL_FLOWS_LABEL = "— All Flows —"
@@ -65,6 +66,32 @@ def _load_cfg() -> dict:
     if CONFIG_FILE.exists():
         return json.loads(CONFIG_FILE.read_text())
     return {"server": "", "database": "", "user": "", "password": ""}
+
+def _load_run_state() -> dict:
+    default = {
+        "mode": "single", "article": "", "articles": [],
+        "wf_mode": "single", "workflow": ALL_FLOWS_LABEL, "workflows": [],
+    }
+    if RUN_STATE_FILE.exists():
+        try:
+            saved = json.loads(RUN_STATE_FILE.read_text())
+            default.update(saved)
+        except Exception:
+            pass
+    return default
+
+def _save_run_state(state: dict) -> None:
+    try:
+        RUN_STATE_FILE.write_text(json.dumps(state, indent=2))
+    except Exception:
+        pass
+
+def _clear_run_state() -> None:
+    try:
+        if RUN_STATE_FILE.exists():
+            RUN_STATE_FILE.unlink()
+    except Exception:
+        pass
 
 def _apply_env(cfg: dict) -> None:
     os.environ["MSSQL_SERVER"]   = cfg.get("server",   "")
@@ -639,6 +666,7 @@ def index_page() -> None:
                 lbl_run = ui.label("").style("font-size:12px; color:var(--imos-muted); min-height:18px; margin-top:8px")
 
                 _articles_loaded = {"done": False}
+                _run_persist_state = _load_run_state()
 
                 def _load_articles():
                     if _articles_loaded["done"]:
@@ -657,11 +685,46 @@ def index_page() -> None:
                         sel_articles_multi.options = names
                         sel_articles_multi.update()
                         lbl_run.style("color:var(--imos-success)").set_text(f"✓ {len(names)} articles loaded")
+                        _restore_run_selection()
                     except Exception as e:
                         _articles_loaded["done"] = False
                         lbl_run.style("color:#e11d48").set_text(f"✗ {e}")
 
                 ui.timer(0.1, _load_articles, once=True)
+
+                def _restore_run_selection() -> None:
+                    st = _run_persist_state
+                    try:
+                        if st.get("mode") == "all":
+                            chk_all.set_value(True)
+                        elif st.get("mode") == "multi":
+                            chk_multi.set_value(True)
+                            if st.get("articles"):
+                                sel_articles_multi.set_value(st["articles"])
+                        elif st.get("article") and st["article"] in (sel_article.options or []):
+                            sel_article.set_value(st["article"])
+
+                        if st.get("wf_mode") == "multi":
+                            chk_multi_wf.set_value(True)
+                            if st.get("workflows"):
+                                sel_workflow_multi.set_value(st["workflows"])
+                        elif st.get("workflow"):
+                            sel_workflow.set_value(st["workflow"])
+                        _refresh_article_visibility()
+                        _refresh_workflow_visibility()
+                    except Exception:
+                        pass
+
+                def _persist_current_selection() -> None:
+                    state = {
+                        "mode": "all" if chk_all.value else ("multi" if chk_multi.value else "single"),
+                        "article": sel_article.value or "",
+                        "articles": sel_articles_multi.value or [],
+                        "wf_mode": "multi" if chk_multi_wf.value else "single",
+                        "workflow": sel_workflow.value or ALL_FLOWS_LABEL,
+                        "workflows": sel_workflow_multi.value or [],
+                    }
+                    _save_run_state(state)
 
                 def _refresh_article_visibility():
                     if chk_all.value:
@@ -804,6 +867,21 @@ def index_page() -> None:
                         btn_run.enable()
                         _set_loading(False)
 
+                def on_reset():
+                    chk_all.set_value(False)
+                    chk_multi.set_value(False)
+                    chk_multi_wf.set_value(False)
+                    sel_article.set_value(None)
+                    sel_articles_multi.set_value([])
+                    sel_workflow.set_value(ALL_FLOWS_LABEL)
+                    sel_workflow_multi.set_value([])
+                    _refresh_article_visibility()
+                    _refresh_workflow_visibility()
+                    _clear_run_state()
+                    lbl_run.style("color:var(--imos-muted)").set_text("")
+                    _set_status("Ready — select articles and workflows, then press RUN")
+                    ui.notify("Reset complete", type="info", position="top-right")
+
                 async def on_run():
                     art  = None
                     arts = None
@@ -831,6 +909,7 @@ def index_page() -> None:
                     else:
                         workflows = [sel_workflow.value]
 
+                    _persist_current_selection()
                     await _execute_run(workflows, art, chk_all.value, arts, switch_tab=True)
 
                 async def on_rerun():
@@ -839,9 +918,11 @@ def index_page() -> None:
                     await _execute_run(_last_run["workflows"], _last_run["art"],
                                         _last_run["all_arts"], _last_run["arts"], switch_tab=False)
 
-                with ui.row().classes("q-mt-md"):
+                with ui.row().classes("q-mt-md items-center").style("gap:12px"):
                     btn_run = ui.button("RUN", icon="play_arrow", on_click=on_run).classes(
                         "btn-orange btn-run").props("unelevated size=lg color=orange-8 text-color=black")
+                    ui.button("RESET", icon="restart_alt", on_click=on_reset).classes(
+                        "btn-danger btn-run").props("unelevated size=lg color=orange-8 text-color=black")
 
         # ── Results ──────────────────────────────────────────────────────
         with ui.tab_panel(t_results):
@@ -1065,7 +1146,13 @@ def index_page() -> None:
     # ── results filter / sort logic ────────────────────────────────────────
 
     def _set_filter(key: str, val) -> None:
-        _filters[key] = (val or "").strip().lower() if isinstance(val, str) else bool(val)
+        if isinstance(val, str):
+            cleaned = val.strip().lower()
+            if key == "search" and cleaned.startswith(("$", "#")):
+                cleaned = cleaned[1:]
+            _filters[key] = cleaned
+        else:
+            _filters[key] = bool(val)
         _apply_filters()
 
     def _apply_filters() -> None:
