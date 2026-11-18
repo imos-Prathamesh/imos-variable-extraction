@@ -1198,6 +1198,47 @@ class AnglprimMixin:
                 if val:
                     self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
 
+    def _imosdoorsinfo_branch_tambour(self, name, path, type_value):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINFO_TAMBOUR_V
+        branch = BRANCHES[STATE_IMOSDOORSINFO_TAMBOUR_V]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("TYPE"), (type_value,)):
+                continue
+
+            situname = normalize(row.get("SITUNAME"))
+            if situname:
+                self._classify(situname, STATE_CONNECTIONS, path + [f"IMOSDOORSINFO.SITUNAME={situname}"],
+                               "IMOSDOORSINFO", "SITUNAME")
+
+            left = self._int_in(row.get("USETUERLINKS"), (0,))
+            left1 = self._int_in(row.get("USETUERLINKS"), (1,))
+            right = self._int_in(row.get("USETUERRECHTS"), (0,))
+            right1 = self._int_in(row.get("USETUERRECHTS"), (1,))
+
+            if left and right1:
+                tuerpos_filter = "AND TUERPOS = 2"
+            elif left1 and right:
+                tuerpos_filter = "AND TUERPOS = 1"
+            elif left1 and right1:
+                tuerpos_filter = ""
+            else:
+                continue
+
+            single_rows = query(
+                "SELECT SITUNAMEGRIFF, SITUNAMEGRIFF1, SITUNAMEGRIFF2 FROM dbo.[IMOSDOORSINGLE] "
+                "WHERE NAME = ? AND (NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL) " + tuerpos_filter,
+                (name,)
+            )
+            for srow in single_rows:
+                for col in ("SITUNAMEGRIFF", "SITUNAMEGRIFF1", "SITUNAMEGRIFF2"):
+                    val = normalize(srow.get(col))
+                    if val:
+                        self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return
