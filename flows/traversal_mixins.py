@@ -1146,6 +1146,58 @@ class AnglprimMixin:
                 if val:
                     self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
 
+    def _imosdoorsinfo_branch_foldslide(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINFO_FOLDSLIDE, STATE_IMOSDOORSINGLE_FOLDSLIDE
+        branch = BRANCHES[STATE_IMOSDOORSINFO_FOLDSLIDE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("TYPE"), (2,)):
+                continue
+
+            if self._int_in(row.get("FRONTABW"), (0,)):
+                for col in ("SABSTANDOBEN", "SABSTANDUNTEN", "SABSTANDLINKS", "SABSTANDRECHTS"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                       "IMOSDOORSINFO", col)
+
+            for col in ("SEINRUECKUNG1", "SUEBERLAPPUNG"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            frontaufteilung = normalize(row.get("FRONTAUFTEILUNG"))
+            if frontaufteilung:
+                self._classify(frontaufteilung, STATE_TERMINAL, path + [f"IMOSDOORSINFO.FRONTAUFTEILUNG={frontaufteilung}"],
+                               "IMOSDOORSINFO", "FRONTAUFTEILUNG")
+
+            situname = normalize(row.get("SITUNAME"))
+            if situname:
+                self._classify(situname, STATE_CONNECTIONS, path + [f"IMOSDOORSINFO.SITUNAME={situname}"],
+                               "IMOSDOORSINFO", "SITUNAME")
+
+            self._imosdoorsingle_branch_foldslide(name, path)
+
+    def _imosdoorsingle_branch_foldslide(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINGLE_FOLDSLIDE
+        branch = BRANCHES[STATE_IMOSDOORSINGLE_FOLDSLIDE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            btausp = normalize(row.get("BTAUSP"))
+            if btausp:
+                self._resolve_then(btausp, path + [f"IMOSDOORSINGLE.BTAUSP={btausp}"], self._kms_branch)
+            for col in ("SITUNAMEGRIFF", "SITUNAMEGRIFF1", "SITUNAMEGRIFF2"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return

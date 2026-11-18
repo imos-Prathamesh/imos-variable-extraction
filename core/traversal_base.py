@@ -23,6 +23,7 @@ from core.branches import (
     STATE_DOOR_FLAP, STATE_DOOR_DOUBLE,
     STATE_IMOSDOORSINFO, STATE_IMOSDOORSINGLE,
     STATE_IMOSDOORSINFO_BIFOLD, STATE_IMOSDOORSINGLE_BIFOLD,
+    STATE_IMOSDOORSINFO_FOLDSLIDE, STATE_IMOSDOORSINGLE_FOLDSLIDE,
     Branch,
 )
 
@@ -213,6 +214,8 @@ class BaseTraversal:
                 self._imosdoorsinfo_branch(value, path)
             elif state == STATE_IMOSDOORSINFO_BIFOLD:
                 self._imosdoorsinfo_branch_bifold(value, path)
+            elif state == STATE_IMOSDOORSINFO_FOLDSLIDE:
+                self._imosdoorsinfo_branch_foldslide(value, path)
             elif state == STATE_DOORSING:
                 self._doorsing_branch(value, path)
             elif state == STATE_GRIFF:
