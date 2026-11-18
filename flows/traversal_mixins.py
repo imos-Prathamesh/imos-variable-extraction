@@ -1092,6 +1092,60 @@ class AnglprimMixin:
                 if val:
                     self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
 
+    def _imosdoorsinfo_branch_bifold(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINFO_BIFOLD, STATE_IMOSDOORSINGLE_BIFOLD
+        branch = BRANCHES[STATE_IMOSDOORSINFO_BIFOLD]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("TYPE"), (1,)):
+                continue
+
+            if self._int_in(row.get("FRONTABW"), (0,)):
+                for col in ("SABSTANDOBEN", "SABSTANDUNTEN", "SABSTANDLINKS", "SABSTANDRECHTS"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                       "IMOSDOORSINFO", col)
+
+            for col in ("SEINRUECKUNG1", "SUEBERLAPPUNG"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            for col in ("FRONTAUFTRECHTS", "FRONTAUFTLINKS"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            for col in ("SITUNAME", "SITUNAMELINKS", "SITUNAMERECHTS"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CONNECTIONS, path + [f"IMOSDOORSINFO.{col}={val}"],
+                                   "IMOSDOORSINFO", col)
+
+            self._imosdoorsingle_branch_bifold(name, path)
+
+    def _imosdoorsingle_branch_bifold(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_IMOSDOORSINGLE_BIFOLD
+        branch = BRANCHES[STATE_IMOSDOORSINGLE_BIFOLD]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            btausp = normalize(row.get("BTAUSP"))
+            if btausp:
+                self._resolve_then(btausp, path + [f"IMOSDOORSINGLE.BTAUSP={btausp}"], self._kms_branch)
+            for col in ("SITUNAMEGRIFF", "SITUNAMEGRIFF1", "SITUNAMEGRIFF2"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return
