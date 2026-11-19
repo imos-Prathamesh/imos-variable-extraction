@@ -5,7 +5,7 @@
   "wf_mode": "multi",
   "workflow": "\u2014 All Flows \u2014",
   "workflows": [
-    "anglzone_cp_top_bot_panel_shelf",
-    "anglzone_cp_top_bot_rail_shelf"
+    "anglzone_cp_fix_panel_shelf",
+    "anglzone_cp_fix_rail_shelf"
   ]
 }
