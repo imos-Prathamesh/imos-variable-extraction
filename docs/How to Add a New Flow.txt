@@ -1,9 +1,8 @@
 How to Add a New Flow — IMOS Variable Extractor
 ════════════════════════════════════════════════
 
-This project uses a FLOW REGISTRY (core/flow_registry.py) that
-auto-discovers every flow module inside flows/. You do NOT need to
-edit main.py or ui/main_window.py to add a new flow — just follow
+This project uses a FLOW REGISTRY (core/flow_registry.py) that auto-discovers every flow module inside flows/.
+You do NOT need to edit main.py or ui/main_window.py to add a new flow — just follow
 the contract below and it appears automatically in:
 
   - CLI:  --flow <your_flow_name>
