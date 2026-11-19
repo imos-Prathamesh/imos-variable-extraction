@@ -1589,6 +1589,37 @@ class AnglprimMixin:
                     self._classify(divider, STATE_CABIN_ADJUSTABLE_SHELF, path + [f"anglzone.DIVIDER={divider}"],
                                    "anglzone", "DIVIDER")
 
+    def _anglzone_branch_partition(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_PARTITION, STATE_IDENT, STATE_CABIN
+        branch = BRANCHES[STATE_ANGLZONE_PARTITION]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            maninfodi = normalize(row.get("MANINFODI"))
+            if maninfodi:
+                self._generic_branch(maninfodi, STATE_IDENT, path + [f"anglzone.MANINFODI={maninfodi}"])
+
+            divtype = (normalize(row.get("DIVTYPE")) or "").upper()
+            if divtype == "P":
+                divider = normalize(row.get("DIVIDER"))
+                if divider:
+                    self._classify(divider, STATE_CABIN, path + [f"anglzone.DIVIDER={divider}"],
+                                   "anglzone", "DIVIDER")
+
+            hordeftype = row.get("HORDEFTYPE")
+            if self._int_in(hordeftype, (2,)):
+                cols = ("LINDIV1", "LINDIV2")
+            elif (normalize(hordeftype) or "").upper() == "A":
+                cols = ("LINDIV1", "SDIVANGLE")
+            else:
+                cols = ("LINDIV1",)
+            for col in cols:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"anglzone.{col}={val}"], "anglzone", col)
+
     def _cabin_branch_adjustable_shelf(self, name, path):
         if not name:
             return

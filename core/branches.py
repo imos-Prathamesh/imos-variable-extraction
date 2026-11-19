@@ -785,3 +785,16 @@ BRANCHES[STATE_CABIN_ADJUSTABLE_SHELF] = Branch(
     next_state=STATE_TERMINAL,
     order_columns=[],
 )
+
+STATE_ANGLZONE_PARTITION = "ANGLZONE_PARTITION"
+
+BRANCHES[STATE_ANGLZONE_PARTITION] = Branch(
+    label="anglzone",
+    match_table="anglzone",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["MANINFODI", "DIVIDER", "DIVTYPE", "HORDEFTYPE",
+                    "LINDIV1", "LINDIV2", "SDIVANGLE"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
