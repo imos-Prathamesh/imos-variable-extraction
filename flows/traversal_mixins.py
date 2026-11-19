@@ -1566,6 +1566,59 @@ class AnglprimMixin:
                     if val:
                         self._classify(val, STATE_TERMINAL, path + [f"TRAVERSE.{col}={val}"], "TRAVERSE", col)
 
+    def _anglzone_branch_adjustable_shelf(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_ADJUSTABLE_SHELF, STATE_IDENT, STATE_CABIN_ADJUSTABLE_SHELF
+        branch = BRANCHES[STATE_ANGLZONE_ADJUSTABLE_SHELF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            maninfodi = normalize(row.get("MANINFODI"))
+            if maninfodi:
+                self._generic_branch(maninfodi, STATE_IDENT, path + [f"anglzone.MANINFODI={maninfodi}"])
+
+            lindiv1 = normalize(row.get("LINDIV1"))
+            if lindiv1:
+                self._classify(lindiv1, STATE_TERMINAL, path + [f"anglzone.LINDIV1={lindiv1}"], "anglzone", "LINDIV1")
+
+            divtype = (normalize(row.get("DIVTYPE")) or "").upper()
+            if divtype == "A":
+                divider = normalize(row.get("DIVIDER"))
+                if divider:
+                    self._classify(divider, STATE_CABIN_ADJUSTABLE_SHELF, path + [f"anglzone.DIVIDER={divider}"],
+                                   "anglzone", "DIVIDER")
+
+    def _cabin_branch_adjustable_shelf(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_CABIN_ADJUSTABLE_SHELF
+        branch = BRANCHES[STATE_CABIN_ADJUSTABLE_SHELF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if self._int_in(row.get("KONSTTYP"), (8,)):
+                continue
+
+            for col in ("UEBERST_R", "UEBERST_L", "UEBERST_V", "UEBERST_H", "SX_WINKEL", "SY_WINKEL"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"CABIN.{col}={val}"], "CABIN", col)
+
+            cpinfo = normalize(row.get("CPINFO"))
+            if cpinfo:
+                self._generic_branch(cpinfo, STATE_IDENT, path + [f"CABIN.CPINFO={cpinfo}"])
+
+            nut = normalize(row.get("NUT_ERB"))
+            if nut:
+                self._nut_erb_branch(nut, path + [f"CABIN.NUT_ERB={nut}"])
+
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"CABIN.KMS={kms}"], self._kms_branch)
+
+            self._cabin_cpconnprim_branch(name, path)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return
