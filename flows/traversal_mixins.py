@@ -1239,6 +1239,171 @@ class AnglprimMixin:
                     if val:
                         self._resolve_then(val, path + [f"IMOSDOORSINGLE.{col}={val}"], self._griff_branch)
 
+    def _anglzone_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE, STATE_IDENT, STATE_CABIN
+        branch = BRANCHES[STATE_ANGLZONE]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in ("MANINFOTS", "MANINFOBS"):
+                val = normalize(row.get(col))
+                if val:
+                    self._generic_branch(val, STATE_IDENT, path + [f"anglzone.{col}={val}"])
+            for col in ("TOPSHELF", "BOTSHELF"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CABIN, path + [f"anglzone.{col}={val}"], "anglzone", col)
+
+    def _cabin_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_CABIN
+        branch = BRANCHES[STATE_CABIN]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if self._int_in(row.get("KONSTTYP"), (8,)):
+                continue
+
+            for col in ("UEBERST_R", "UEBERST_L", "UEBERST_V", "UEBERST_H", "SHOEHE"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"CABIN.{col}={val}"], "CABIN", col)
+
+            cpinfo = normalize(row.get("CPINFO"))
+            if cpinfo:
+                self._generic_branch(cpinfo, STATE_IDENT, path + [f"CABIN.CPINFO={cpinfo}"])
+
+            nut = normalize(row.get("NUT_ERB"))
+            if nut:
+                self._nut_erb_branch(nut, path + [f"CABIN.NUT_ERB={nut}"])
+
+            kms = normalize(row.get("KMS"))
+            if kms:
+                self._resolve_then(kms, path + [f"CABIN.KMS={kms}"], self._kms_branch)
+
+            self._cabin_cpconnprim_branch(name, path)
+
+    def _cabin_cpconnprim_branch(self, name, path):
+        prim_rows = query(
+            "SELECT ONLYONECON FROM dbo.[CPCONNPRIM] WHERE NAME = ? AND TYPE = 3",
+            (name,)
+        )
+        if not prim_rows:
+            return
+
+        if self._int_in(prim_rows[0].get("ONLYONECON"), (1,)):
+            rows = query(
+                "SELECT CONNECTID FROM dbo.[CPCONNLIST] "
+                "WHERE NAME = ? AND TYPE = 3 AND CONNNUM = 0",
+                (name,)
+            )
+        else:
+            rows = query(
+                "SELECT CONNECTID FROM dbo.[CPCONNLIST] "
+                "WHERE NAME = ? AND TYPE = 3 AND CONNNUM IN (0, 1)",
+                (name,)
+            )
+
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._resolve_then(cid, path + [f"CPCONNLIST.CONNECTID={cid}"], self._connections_match)
+
+    def _connections_match(self, value, path):
+        self._classify(value, STATE_CONNECTIONS, path, "CPCONNLIST", "CONNECTID")
+
+    def _anglzone_branch_rail(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_RAIL, STATE_IDENT, STATE_CABIN_RAIL
+        branch = BRANCHES[STATE_ANGLZONE_RAIL]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            for col in ("MANINFOTS", "MANINFOBS"):
+                val = normalize(row.get(col))
+                if val:
+                    self._generic_branch(val, STATE_IDENT, path + [f"anglzone.{col}={val}"])
+            for col in ("TOPSHELF", "BOTSHELF"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_CABIN_RAIL, path + [f"anglzone.{col}={val}"], "anglzone", col)
+
+    def _cabin_branch_rail(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_CABIN_RAIL, STATE_IDENT
+        branch = BRANCHES[STATE_CABIN_RAIL]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("KONSTTYP"), (8,)):
+                continue
+
+            val = normalize(row.get("SHOEHE"))
+            if val:
+                self._classify(val, STATE_TERMINAL, path + [f"CABIN.SHOEHE={val}"], "CABIN", "SHOEHE")
+
+            cpinfo = normalize(row.get("CPINFO"))
+            if cpinfo:
+                self._generic_branch(cpinfo, STATE_IDENT, path + [f"CABIN.CPINFO={cpinfo}"])
+
+            self._cabin_cpconnprim_branch_rail(name, path)
+            self._traverse_branch_rail(name, path)
+
+    def _cabin_cpconnprim_branch_rail(self, name, path):
+        prim_rows = query(
+            "SELECT ONLYONECON FROM dbo.[CPCONNPRIM] WHERE NAME = ? AND TYPE = 3",
+            (name,)
+        )
+        if not prim_rows:
+            return
+
+        if self._int_in(prim_rows[0].get("ONLYONECON"), (1,)):
+            rows = query(
+                "SELECT CONNECTID FROM dbo.[CPCONNLIST] "
+                "WHERE NAME = ? AND TYPE = 3 AND CONNNUM = 0",
+                (name,)
+            )
+        else:
+            rows = query(
+                "SELECT CONNECTID FROM dbo.[CPCONNLIST] "
+                "WHERE NAME = ? AND TYPE = 3",
+                (name,)
+            )
+
+        for row in rows:
+            cid = normalize(row.get("CONNECTID"))
+            if cid:
+                self._resolve_then(cid, path + [f"CPCONNLIST.CONNECTID={cid}"], self._connections_match)
+
+    def _traverse_branch_rail(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_TRAVERSE_RAIL
+        branch = BRANCHES[STATE_TRAVERSE_RAIL]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            kms_vorne = normalize(row.get("KMS_VORNE"))
+            if kms_vorne:
+                self._resolve_then(kms_vorne, path + [f"TRAVERSE.KMS_VORNE={kms_vorne}"], self._kms_branch)
+                for col in ("UEBERST_RV", "UEBERST_LV", "SCONDFRON", "STIEF_VORN"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"TRAVERSE.{col}={val}"], "TRAVERSE", col)
+
+            kms_hinten = normalize(row.get("KMS_HINTEN"))
+            if kms_hinten:
+                self._resolve_then(kms_hinten, path + [f"TRAVERSE.KMS_HINTEN={kms_hinten}"], self._kms_branch)
+                for col in ("UEBERST_RH", "UEBERST_LH", "SCONDBACK", "STIEF_HINT"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"TRAVERSE.{col}={val}"], "TRAVERSE", col)
+
     def _doorsing_branch(self, name, path):
         if not name:
             return

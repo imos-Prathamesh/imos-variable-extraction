@@ -25,6 +25,8 @@ from core.branches import (
     STATE_IMOSDOORSINFO_BIFOLD, STATE_IMOSDOORSINGLE_BIFOLD,
     STATE_IMOSDOORSINFO_FOLDSLIDE, STATE_IMOSDOORSINGLE_FOLDSLIDE,
     STATE_IMOSDOORSINFO_TAMBOUR_V, STATE_IMOSDOORSINFO_TAMBOUR_H,
+    STATE_ANGLZONE, STATE_CABIN,
+    STATE_ANGLZONE_RAIL, STATE_CABIN_RAIL, STATE_TRAVERSE_RAIL,
     Branch,
 )
 
@@ -221,6 +223,14 @@ class BaseTraversal:
                 self._imosdoorsinfo_branch_tambour(value, path, 3)
             elif state == STATE_IMOSDOORSINFO_TAMBOUR_H:
                 self._imosdoorsinfo_branch_tambour(value, path, 4)
+            elif state == STATE_ANGLZONE:
+                self._anglzone_branch(value, path)
+            elif state == STATE_CABIN:
+                self._cabin_branch(value, path)
+            elif state == STATE_ANGLZONE_RAIL:
+                self._anglzone_branch_rail(value, path)
+            elif state == STATE_CABIN_RAIL:
+                self._cabin_branch_rail(value, path)
             elif state == STATE_DOORSING:
                 self._doorsing_branch(value, path)
             elif state == STATE_GRIFF:

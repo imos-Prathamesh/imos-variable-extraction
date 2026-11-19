@@ -70,6 +70,11 @@ STATE_IMOSDOORSINFO_FOLDSLIDE  = "IMOSDOORSINFO_FOLDSLIDE"
 STATE_IMOSDOORSINGLE_FOLDSLIDE = "IMOSDOORSINGLE_FOLDSLIDE"
 STATE_IMOSDOORSINFO_TAMBOUR_V  = "IMOSDOORSINFO_TAMBOUR_V"
 STATE_IMOSDOORSINFO_TAMBOUR_H  = "IMOSDOORSINFO_TAMBOUR_H"
+STATE_ANGLZONE       = "ANGLZONE"
+STATE_CABIN          = "CABIN"
+STATE_ANGLZONE_RAIL  = "ANGLZONE_RAIL"
+STATE_CABIN_RAIL     = "CABIN_RAIL"
+STATE_TRAVERSE_RAIL  = "TRAVERSE_RAIL"
 
 
 @dataclass
@@ -654,4 +659,56 @@ BRANCHES[STATE_IMOSDOORSINFO_TAMBOUR_V] = Branch(
 
 BRANCHES[STATE_IMOSDOORSINFO_TAMBOUR_H] = replace(
     BRANCHES[STATE_IMOSDOORSINFO_TAMBOUR_V],
+)
+
+BRANCHES[STATE_ANGLZONE] = Branch(
+    label="anglzone",
+    match_table="anglzone",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["MANINFOTS", "MANINFOBS", "TOPSHELF", "BOTSHELF"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_CABIN] = Branch(
+    label="CABIN",
+    match_table="CABIN",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["KONSTTYP", "UEBERST_R", "UEBERST_L", "UEBERST_V", "UEBERST_H", "SHOEHE",
+                    "CPINFO", "NUT_ERB", "KMS"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_ANGLZONE_RAIL] = Branch(
+    label="anglzone",
+    match_table="anglzone",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["MANINFOTS", "MANINFOBS", "TOPSHELF", "BOTSHELF"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_CABIN_RAIL] = Branch(
+    label="CABIN",
+    match_table="CABIN",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["KONSTTYP", "SHOEHE", "CPINFO"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_TRAVERSE_RAIL] = Branch(
+    label="TRAVERSE",
+    match_table="TRAVERSE",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["KMS_VORNE", "KMS_HINTEN", "UEBERST_RV", "UEBERST_LV", "SCONDFRON", "STIEF_VORN",
+                    "UEBERST_RH", "UEBERST_LH", "SCONDBACK", "STIEF_HINT"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
 )
