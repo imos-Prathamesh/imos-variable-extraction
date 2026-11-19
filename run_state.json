@@ -2,7 +2,10 @@
   "mode": "single",
   "article": "MONDAY",
   "articles": [],
-  "wf_mode": "single",
-  "workflow": "anglzone_cp_top_bot_rail",
-  "workflows": []
+  "wf_mode": "multi",
+  "workflow": "\u2014 All Flows \u2014",
+  "workflows": [
+    "anglzone_cp_top_bot_panel_shelf",
+    "anglzone_cp_top_bot_rail_shelf"
+  ]
 }

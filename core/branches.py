@@ -75,6 +75,8 @@ STATE_CABIN          = "CABIN"
 STATE_ANGLZONE_RAIL  = "ANGLZONE_RAIL"
 STATE_CABIN_RAIL     = "CABIN_RAIL"
 STATE_TRAVERSE_RAIL  = "TRAVERSE_RAIL"
+STATE_ANGLZONE_PANEL_SHELF = "ANGLZONE_PANEL_SHELF"
+STATE_ANGLZONE_RAIL_SHELF  = "ANGLZONE_RAIL_SHELF"
 
 
 @dataclass
@@ -711,4 +713,18 @@ BRANCHES[STATE_TRAVERSE_RAIL] = Branch(
                     "UEBERST_RH", "UEBERST_LH", "SCONDBACK", "STIEF_HINT"],
     next_state=STATE_TERMINAL,
     order_columns=[],
+)
+
+BRANCHES[STATE_ANGLZONE_PANEL_SHELF] = Branch(
+    label="anglzone",
+    match_table="anglzone",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["MANINFODI", "DIVIDER", "DIVTYPE", "LINDIV1"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+BRANCHES[STATE_ANGLZONE_RAIL_SHELF] = replace(
+    BRANCHES[STATE_ANGLZONE_PANEL_SHELF],
 )

@@ -1404,6 +1404,50 @@ class AnglprimMixin:
                     if val:
                         self._classify(val, STATE_TERMINAL, path + [f"TRAVERSE.{col}={val}"], "TRAVERSE", col)
 
+    def _anglzone_branch_panel_shelf(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_PANEL_SHELF, STATE_IDENT, STATE_CABIN
+        branch = BRANCHES[STATE_ANGLZONE_PANEL_SHELF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            maninfodi = normalize(row.get("MANINFODI"))
+            if maninfodi:
+                self._generic_branch(maninfodi, STATE_IDENT, path + [f"anglzone.MANINFODI={maninfodi}"])
+
+            lindiv1 = normalize(row.get("LINDIV1"))
+            if lindiv1:
+                self._classify(lindiv1, STATE_TERMINAL, path + [f"anglzone.LINDIV1={lindiv1}"], "anglzone", "LINDIV1")
+
+            divtype = (normalize(row.get("DIVTYPE")) or "").upper()
+            if divtype in ("T", "B"):
+                divider = normalize(row.get("DIVIDER"))
+                if divider:
+                    self._classify(divider, STATE_CABIN, path + [f"anglzone.DIVIDER={divider}"], "anglzone", "DIVIDER")
+
+    def _anglzone_branch_rail_shelf(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_RAIL_SHELF, STATE_IDENT, STATE_CABIN_RAIL
+        branch = BRANCHES[STATE_ANGLZONE_RAIL_SHELF]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            maninfodi = normalize(row.get("MANINFODI"))
+            if maninfodi:
+                self._generic_branch(maninfodi, STATE_IDENT, path + [f"anglzone.MANINFODI={maninfodi}"])
+
+            lindiv1 = normalize(row.get("LINDIV1"))
+            if lindiv1:
+                self._classify(lindiv1, STATE_TERMINAL, path + [f"anglzone.LINDIV1={lindiv1}"], "anglzone", "LINDIV1")
+
+            divtype = (normalize(row.get("DIVTYPE")) or "").upper()
+            if divtype in ("T", "B"):
+                divider = normalize(row.get("DIVIDER"))
+                if divider:
+                    self._classify(divider, STATE_CABIN_RAIL, path + [f"anglzone.DIVIDER={divider}"], "anglzone", "DIVIDER")
+
     def _doorsing_branch(self, name, path):
         if not name:
             return
