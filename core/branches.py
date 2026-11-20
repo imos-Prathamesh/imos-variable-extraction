@@ -803,3 +803,15 @@ STATE_ANGLZONE_SIDE_PARTITION = "ANGLZONE_SIDE_PARTITION"
 BRANCHES[STATE_ANGLZONE_SIDE_PARTITION] = replace(
     BRANCHES[STATE_ANGLZONE_PARTITION],
 )
+
+STATE_ANGLMACH = "ANGLMACH"
+
+BRANCHES[STATE_ANGLMACH] = Branch(
+    label="ANGLMACH",
+    match_table="ANGLMACH",
+    match_column="ANGLNAME",
+    filter_column="INORDER",
+    value_columns=["FACTOR", "SDIAMETER", "SDEEPNES", "NAME"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)

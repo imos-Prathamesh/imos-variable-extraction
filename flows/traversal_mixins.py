@@ -394,6 +394,24 @@ class ConnectionTreeMixin:
         if pv.is_raw:
             self._profil_branch(value, path)
 
+    def _anglmach_branch(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLMACH, STATE_TERMINAL
+        branch = BRANCHES[STATE_ANGLMACH]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            if not self._int_in(row.get("FACTOR"), (1,)):
+                continue
+            for col in ("SDIAMETER", "SDEEPNES"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"ANGLMACH.{col}={val}"], "ANGLMACH", col)
+            prof_name = normalize(row.get("NAME"))
+            if prof_name:
+                self._resolve_then_profil(prof_name, path + [f"ANGLMACH.NAME={prof_name}"])
+
     def _profil_branch(self, name, path):
         state_key = (STATE_PROFIL, name)
         if state_key in self._active:
