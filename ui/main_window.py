@@ -146,13 +146,19 @@ def _run_flow(workflows: list[str], article: str | None, all_arts: bool,
             if info.extract_all is None:
                 continue
             for r in info.extract_all():
+                for o in r.occurrences:
+                    o.flow_name = wf
                 out.extend(r.occurrences)
         elif articles:
             for art in articles:
-                out.extend(info.extract(art).occurrences)
+                res = info.extract(art)
+                for o in res.occurrences:
+                    o.flow_name = wf
+                out.extend(res.occurrences)
         else:
             res = info.extract(article)
             for o in res.occurrences:
+                o.flow_name = wf
                 print(f"    {wf}  →  {o.variable_name} = {o.value}")
             out.extend(res.occurrences)
     return out
@@ -223,6 +229,7 @@ def _build_rows(occurrences: list, typ_map: dict) -> list[dict]:
             "source_table":  o.source_table,
             "source_column": o.source_column,
             "resolved_via":  o.resolved_via,
+            "flow_name":     o.flow_name or "—",
             "path":          o.path_str(),
             "var_type_sty":  _pill_style(var_type),
             "table_sty":     _pill_style(o.source_table),
@@ -1049,6 +1056,9 @@ def index_page() -> None:
                     <q-tr v-if="props.expand" :props="props">
                         <q-td colspan="100%" style="background:var(--imos-surface-2); padding:10px 16px; white-space:normal">
                             <div style="font-size:10px; font-weight:700; color:var(--imos-primary); letter-spacing:0.08em; margin-bottom:4px">
+                                FLOW{{ props.row.flow_name.includes(', ') ? 'S' : '' }}: {{ props.row.flow_name }}
+                            </div>
+                            <div style="font-size:10px; font-weight:700; color:var(--imos-primary); letter-spacing:0.08em; margin-bottom:4px; margin-top:8px">
                                 RESOLUTION PATH
                             </div>
                             <div style="font-family:monospace; font-size:12px; color:var(--imos-text-2); white-space:pre-wrap; word-break:break-word">
@@ -1159,12 +1169,20 @@ def index_page() -> None:
         rows = list(_all_rows)
 
         if _filters["unique"]:
-            seen: set[str] = set()
+            seen: dict[str, dict] = {}
             unique: list[dict] = []
             for r in rows:
-                if r["variable_name"] not in seen:
-                    seen.add(r["variable_name"])
+                vn = r["variable_name"]
+                if vn not in seen:
+                    seen[vn] = r
                     unique.append(r)
+                else:
+                    kept = seen[vn]
+                    flows_so_far = [f for f in kept["flow_name"].split(", ") if f and f != "—"]
+                    this_flow = r["flow_name"]
+                    if this_flow and this_flow != "—" and this_flow not in flows_so_far:
+                        flows_so_far.append(this_flow)
+                        kept["flow_name"] = ", ".join(flows_so_far) if flows_so_far else "—"
             rows = unique
 
         if _filters["search"]:

@@ -348,6 +348,7 @@ BRANCHES: dict[str, Branch] = {
             "SONSETGAPI", "SONSETLAYT", "SONSETLAYB", "SONSETLAYR", "SONSETLAYL",
             "SONSETLAYI", "SFCTRHOR", "SFCTRVERT", "SMIDDLGAPI", "SRASTER",
             "SFRONTDIST", "SBACKDIST", "SSOCKETHGT",
+            "SOCKET", "ONEQUALINS", "ONEQUALLAY",
         ],
         next_state=STATE_TERMINAL,
         order_columns=[],

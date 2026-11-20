@@ -55,6 +55,7 @@ class OccurrenceRow:
     source_table: str
     source_column: str
     resolved_via: str   # DIRECT / IMOS / DESCRIPTOR
+    flow_name: str = ""  # which flow produced this occurrence (set by the UI/CLI caller)
 
     def path_str(self) -> str:
         return " → ".join(self.path)

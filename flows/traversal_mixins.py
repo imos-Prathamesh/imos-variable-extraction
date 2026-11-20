@@ -600,12 +600,30 @@ class AnglprimMixin:
             self._terminal_cols(row, ["FORMULA"], "ARTCALC", path)
 
     def _design_branch(self, name, path):
+        _gated_cols = {
+            "SFRONTDIST", "SBACKDIST", "SSOCKETHGT",
+            "SINSETGAPT", "SINSETGAPB", "SINSETGAPR", "SINSETGAPL", "SINSETGAPI",
+            "SONSETLAYT", "SONSETLAYB", "SONSETLAYR", "SONSETLAYL", "SONSETLAYI",
+        }
+        _excluded = _gated_cols | {"GROOVE", "SOCKET", "ONEQUALINS", "ONEQUALLAY"}
         for row in self._rows(STATE_DESIGN, name):
             groove = normalize(row.get("GROOVE"))
             if groove:
                 self._nut_erb_branch(groove, path + [f"design.GROOVE={groove}"])
-            cols = [c for c in BRANCHES[STATE_DESIGN].value_columns if c != "GROOVE"]
+
+            cols = [c for c in BRANCHES[STATE_DESIGN].value_columns if c not in _excluded]
             self._terminal_cols(row, cols, "design", path)
+
+            if self._int_in(row.get("SOCKET"), (1,)):
+                self._terminal_cols(row, ["SFRONTDIST", "SBACKDIST", "SSOCKETHGT"], "design", path)
+
+            if self._int_in(row.get("ONEQUALINS"), (0,)):
+                self._terminal_cols(row, ["SINSETGAPT", "SINSETGAPB", "SINSETGAPR",
+                                           "SINSETGAPL", "SINSETGAPI"], "design", path)
+
+            if self._int_in(row.get("ONEQUALLAY"), (0,)):
+                self._terminal_cols(row, ["SONSETLAYT", "SONSETLAYB", "SONSETLAYR",
+                                           "SONSETLAYL", "SONSETLAYI"], "design", path)
 
     def _workgroup_branch(self, name, path):
         rows = query(
