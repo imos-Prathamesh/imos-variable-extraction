@@ -492,10 +492,9 @@ BRANCHES[STATE_CSIDE] = Branch(
     match_column="NAME",
     filter_column="INORDER",
     value_columns=[
-        "MDRFLAG", "DISTFRONT", "DISTBACK", "DISTSTART", "DIAMETER", "DEPTH",
-        "CCHEIGTH", "CCDEPTH", "CCRADIUS", "LT_VER", "SRASTER", "SDISTFRONT",
-        "SDISTBACK", "SDISTSEND", "SDIAMETER", "SDEPTH", "SWGTYPE", "SMACHCLASS",
-        "CPINFO", "KMS",
+        "KMS", "MDRFLAG", "CPINFO", "REF_VER",
+        "SRASTER", "SDIAMETER", "SDISTSTART", "SDISTSEND", "SWGTYPE", "SMACHCLASS", "SDEPTH",
+        "SDISTFRONT", "SDISTBACK", "LT_VER",
     ],
     next_state=STATE_TERMINAL,
     order_columns=[],
@@ -797,4 +796,10 @@ BRANCHES[STATE_ANGLZONE_PARTITION] = Branch(
                     "LINDIV1", "LINDIV2", "SDIVANGLE"],
     next_state=STATE_TERMINAL,
     order_columns=[],
+)
+
+STATE_ANGLZONE_SIDE_PARTITION = "ANGLZONE_SIDE_PARTITION"
+
+BRANCHES[STATE_ANGLZONE_SIDE_PARTITION] = replace(
+    BRANCHES[STATE_ANGLZONE_PARTITION],
 )

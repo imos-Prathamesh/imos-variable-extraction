@@ -821,22 +821,36 @@ class AnglprimMixin:
         from core.traversal_base import _fetch_branch
         branch = BRANCHES[STATE_CSIDE]
         rows = _fetch_branch(branch, name)
-        _plain_cols = [
-            "MDRFLAG", "DISTFRONT", "DISTBACK", "DISTSTART", "DIAMETER", "DEPTH",
-            "CCHEIGTH", "CCDEPTH", "CCRADIUS", "LT_VER", "SRASTER", "SDISTFRONT",
-            "SDISTBACK", "SDISTSEND", "SDIAMETER", "SDEPTH", "SWGTYPE", "SMACHCLASS",
-        ]
         for row in rows:
-            for col in _plain_cols:
-                val = normalize(row.get(col))
-                if val:
-                    self._classify(val, STATE_TERMINAL, path + [f"CSIDE.{col}={val}"], "CSIDE", col)
-            info = normalize(row.get("CPINFO"))
-            if info:
-                self._generic_branch(info, STATE_IDENT, path + [f"CSIDE.CPINFO={info}"])
             kms = normalize(row.get("KMS"))
             if kms:
                 self._resolve_then(kms, path + [f"CSIDE.KMS={kms}"], self._kms_branch)
+
+            info = normalize(row.get("CPINFO"))
+            if info:
+                self._generic_branch(info, STATE_IDENT, path + [f"CSIDE.CPINFO={info}"])
+
+            if self._int_in(row.get("MDRFLAG"), (4,)):
+                continue
+
+            if self._int_in(row.get("MDRFLAG"), (3,)):
+                mdr_cols = ("SRASTER", "SDIAMETER", "SDISTSTART", "SDISTSEND", "SWGTYPE", "SMACHCLASS")
+            else:
+                mdr_cols = ("SRASTER", "SDIAMETER", "SDISTSTART", "SDISTSEND", "SWGTYPE", "SMACHCLASS", "SDEPTH")
+            for col in mdr_cols:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"CSIDE.{col}={val}"], "CSIDE", col)
+
+            if self._int_in(row.get("REF_VER"), (3,)):
+                lt_ver = normalize(row.get("LT_VER"))
+                if lt_ver:
+                    self._classify(lt_ver, STATE_TERMINAL, path + [f"CSIDE.LT_VER={lt_ver}"], "CSIDE", "LT_VER")
+            else:
+                for col in ("SDISTFRONT", "SDISTBACK"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"CSIDE.{col}={val}"], "CSIDE", col)
 
     def _cabback_branch(self, name, path):
         if not name:
@@ -1606,6 +1620,37 @@ class AnglprimMixin:
                 divider = normalize(row.get("DIVIDER"))
                 if divider:
                     self._classify(divider, STATE_CABIN, path + [f"anglzone.DIVIDER={divider}"],
+                                   "anglzone", "DIVIDER")
+
+            hordeftype = row.get("HORDEFTYPE")
+            if self._int_in(hordeftype, (2,)):
+                cols = ("LINDIV1", "LINDIV2")
+            elif (normalize(hordeftype) or "").upper() == "A":
+                cols = ("LINDIV1", "SDIVANGLE")
+            else:
+                cols = ("LINDIV1",)
+            for col in cols:
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"anglzone.{col}={val}"], "anglzone", col)
+
+    def _anglzone_branch_side_partition(self, name, path):
+        if not name:
+            return
+        from core.traversal_base import _fetch_branch
+        from core.branches import STATE_ANGLZONE_SIDE_PARTITION, STATE_IDENT, STATE_CSIDE
+        branch = BRANCHES[STATE_ANGLZONE_SIDE_PARTITION]
+        rows = _fetch_branch(branch, name)
+        for row in rows:
+            maninfodi = normalize(row.get("MANINFODI"))
+            if maninfodi:
+                self._generic_branch(maninfodi, STATE_IDENT, path + [f"anglzone.MANINFODI={maninfodi}"])
+
+            divtype = (normalize(row.get("DIVTYPE")) or "").upper()
+            if divtype in ("S", "D"):
+                divider = normalize(row.get("DIVIDER"))
+                if divider:
+                    self._classify(divider, STATE_CSIDE, path + [f"anglzone.DIVIDER={divider}"],
                                    "anglzone", "DIVIDER")
 
             hordeftype = row.get("HORDEFTYPE")

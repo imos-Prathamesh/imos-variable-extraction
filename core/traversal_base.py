@@ -33,6 +33,7 @@ from core.branches import (
     STATE_TRAVERSE_FIX_RAIL_SHELF,
     STATE_ANGLZONE_ADJUSTABLE_SHELF, STATE_CABIN_ADJUSTABLE_SHELF,
     STATE_ANGLZONE_PARTITION,
+    STATE_ANGLZONE_SIDE_PARTITION,
     Branch,
 )
 
@@ -255,6 +256,8 @@ class BaseTraversal:
                 self._cabin_branch_adjustable_shelf(value, path)
             elif state == STATE_ANGLZONE_PARTITION:
                 self._anglzone_branch_partition(value, path)
+            elif state == STATE_ANGLZONE_SIDE_PARTITION:
+                self._anglzone_branch_side_partition(value, path)
             elif state == STATE_DOORSING:
                 self._doorsing_branch(value, path)
             elif state == STATE_GRIFF:
