@@ -816,3 +816,30 @@ BRANCHES[STATE_ANGLMACH] = Branch(
     next_state=STATE_TERMINAL,
     order_columns=[],
 )
+
+STATE_DRAWERZONE = "DRAWERZONE"
+
+BRANCHES[STATE_DRAWERZONE] = Branch(
+    label="DRAWERZONE",
+    match_table="DRAWERZONE",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["DIVISION", "BMODEVAR", "ONSETVAR", "FRONTDEF", "FRONTDEFVERT",
+                    "INSETFRONT", "INSETBACK", "INSETLEFT", "INSETRIGHT", "INSETTOP", "INSETBOT",
+                    "ONSETLEFT", "ONSETRIGHT"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)
+
+STATE_DRAWERSING = "DRAWERSING"
+
+BRANCHES[STATE_DRAWERSING] = Branch(
+    label="DRAWERSING",
+    match_table="DRAWERSING",
+    match_column="NAME",
+    filter_column="INORDER",
+    value_columns=["FRONTTHK", "INSETFRONT", "INSETBACK", "INSETLEFT", "INSETRIGHT",
+                    "INSETTOP", "INSETBOT", "DRMANINFO", "FRONTINFO", "FRONTPARTDEF"],
+    next_state=STATE_TERMINAL,
+    order_columns=[],
+)

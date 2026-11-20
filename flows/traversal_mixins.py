@@ -599,6 +599,34 @@ class AnglprimMixin:
         for row in self._rows(STATE_ARTCALC, name):
             self._terminal_cols(row, ["FORMULA"], "ARTCALC", path)
 
+    def _drawerzone_branch(self, name, path):
+        from core.branches import STATE_DRAWERZONE
+        for row in self._rows(STATE_DRAWERZONE, name):
+            self._terminal_cols(row, ["DIVISION", "BMODEVAR", "ONSETVAR"], "DRAWERZONE", path)
+            self._terminal_cols(row, ["INSETFRONT", "INSETBACK", "INSETLEFT",
+                                       "INSETRIGHT", "INSETTOP", "INSETBOT"], "DRAWERZONE", path)
+
+            if self._int_in(row.get("FRONTDEF"), (0,)) and self._int_in(row.get("FRONTDEFVERT"), (0,)):
+                self._terminal_cols(row, ["ONSETLEFT", "ONSETRIGHT"], "DRAWERZONE", path)
+
+            self._drawersing_branch(name, path)
+
+    def _drawersing_branch(self, name, path):
+        from core.branches import STATE_DRAWERSING
+        for row in self._rows(STATE_DRAWERSING, name):
+            self._terminal_cols(row, ["FRONTTHK", "INSETFRONT", "INSETBACK", "INSETLEFT",
+                                       "INSETRIGHT", "INSETTOP", "INSETBOT"], "DRAWERSING", path)
+
+            for col in ("DRMANINFO", "FRONTINFO"):
+                val = normalize(row.get(col))
+                if val:
+                    self._generic_branch(val, STATE_IDENT, path + [f"DRAWERSING.{col}={val}"])
+
+            frontpartdef = normalize(row.get("FRONTPARTDEF"))
+            if frontpartdef:
+                self._resolve_then(frontpartdef, path + [f"DRAWERSING.FRONTPARTDEF={frontpartdef}"],
+                                    self._kms_branch)
+
     def _design_branch(self, name, path):
         _gated_cols = {
             "SFRONTDIST", "SBACKDIST", "SSOCKETHGT",

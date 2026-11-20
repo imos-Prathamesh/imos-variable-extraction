@@ -1,10 +1,10 @@
 {
   "mode": "single",
-  "article": "LINEBORING",
+  "article": "DRAWERUNIT",
   "articles": [],
   "wf_mode": "multi",
   "workflow": "\u2014 All Flows \u2014",
   "workflows": [
-    "\u2014 All Flows \u2014"
+    "DRAWERZONE_IX_PROPERTIES_PD"
   ]
 }
