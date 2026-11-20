@@ -37,6 +37,12 @@ from core.branches import (
     Branch,
 )
 
+# Module-level call stack for article re-entry (used only by flows that
+# explicitly call BaseTraversal._reenter_as_article). Shared across nested
+# extract() calls so cycles are caught even though each re-entered flow run
+# creates a brand-new BaseTraversal instance. No existing flow touches this.
+_ARTICLE_REENTRY_STACK: list[str] = []
+
 
 # ─── result records ───────────────────────────────────────────────────────────
 
@@ -292,3 +298,37 @@ class BaseTraversal:
             resolved_via=resolved_via,
         ))
         self.result.unique_vars[varname] = value
+
+    # ── article re-entry: opt-in only, no other flow calls this ──────────────
+
+    def _reenter_as_article(self, value: str, path: list[str]) -> None:
+        """
+        Treat `value` as a brand-new articles.NAME and run it through every
+        flow currently registered in core.flow_registry (existing ones today,
+        and any new articles.NAME-starting flow added later with zero code
+        change here). Results are merged into this same self.result.
+        Purely additive: no existing flow calls this, so no existing flow's
+        behavior changes.
+        """
+        if not value:
+            return
+        if value in _ARTICLE_REENTRY_STACK:
+            self.result.cycles.append(f"CYCLE: {' → '.join(path)} → ARTICLE({value})")
+            return
+        if len(_ARTICLE_REENTRY_STACK) >= self.max_depth:
+            return
+
+        _ARTICLE_REENTRY_STACK.append(value)
+        try:
+            from core.flow_registry import get_registry
+            registry = get_registry()
+            for flow_name, info in sorted(registry.items()):
+                try:
+                    sub_result = info.extract(value, self.max_depth)
+                except Exception:
+                    continue
+                self.result.occurrences.extend(sub_result.occurrences)
+                self.result.unique_vars.update(sub_result.unique_vars)
+                self.result.cycles.extend(sub_result.cycles)
+        finally:
+            _ARTICLE_REENTRY_STACK.pop()
