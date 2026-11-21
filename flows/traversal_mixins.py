@@ -738,6 +738,82 @@ class AnglprimMixin:
                 self._classify(conisitu, STATE_CONNECTIONS, path + [f"dranglconi.CONISITU={conisitu}"],
                                "dranglconi", "CONISITU")
 
+    def _dr_front_branch_purchase(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT SET_FRONT, THKSTR, PART_INFO, PART_DEF, "
+            "CONNSIT_PULL, CONNSIT_PULL2, CONNSIT_PULL3 "
+            "FROM dbo.[DR_FRONT] WHERE NAME = ? "
+            "AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        for row in rows:
+            self._dr_main_branch_purchase(name, path)
+
+            if not self._int_in(row.get("SET_FRONT"), (1,)):
+                continue
+
+            thkstr = normalize(row.get("THKSTR"))
+            if thkstr:
+                self._classify(thkstr, STATE_TERMINAL, path + [f"DR_FRONT.THKSTR={thkstr}"],
+                               "DR_FRONT", "THKSTR")
+
+            part_info = normalize(row.get("PART_INFO"))
+            if part_info:
+                self._generic_branch(part_info, STATE_IDENT, path + [f"DR_FRONT.PART_INFO={part_info}"])
+
+            part_def = normalize(row.get("PART_DEF"))
+            if part_def:
+                self._resolve_then(part_def, path + [f"DR_FRONT.PART_DEF={part_def}"], self._kms_branch)
+
+            for col in ("CONNSIT_PULL", "CONNSIT_PULL2", "CONNSIT_PULL3"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"DR_FRONT.{col}={val}"], self._griff_branch)
+
+    def _dr_main_branch_purchase(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT TYPE, DR_X, DR_Z, DRDS_BEFR, DRDS_TEFR, "
+            "IGNORE_DRDSTOSH, DRDS_TOSH, IGNORE_DRDSBOSH, DRDS_BOSH, "
+            "DRMANINFO, CONNSIT_SLIDE "
+            "FROM dbo.[DR_MAIN] WHERE NAME = ?",
+            (name,)
+        )
+        for row in rows:
+            for col in ("DRDS_BEFR", "DRDS_TEFR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.{col}={val}"], "DR_MAIN", col)
+
+            if self._int_in(row.get("IGNORE_DRDSTOSH"), (0,)):
+                val = normalize(row.get("DRDS_TOSH"))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.DRDS_TOSH={val}"], "DR_MAIN", "DRDS_TOSH")
+
+            if self._int_in(row.get("IGNORE_DRDSBOSH"), (0,)):
+                val = normalize(row.get("DRDS_BOSH"))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.DRDS_BOSH={val}"], "DR_MAIN", "DRDS_BOSH")
+
+            drmaninfo = normalize(row.get("DRMANINFO"))
+            if drmaninfo:
+                self._generic_branch(drmaninfo, STATE_IDENT, path + [f"DR_MAIN.DRMANINFO={drmaninfo}"])
+
+            connsit_slide = normalize(row.get("CONNSIT_SLIDE"))
+            if connsit_slide:
+                self._classify(connsit_slide, STATE_CONNECTIONS,
+                               path + [f"DR_MAIN.CONNSIT_SLIDE={connsit_slide}"],
+                               "DR_MAIN", "CONNSIT_SLIDE")
+
+            if self._int_in(row.get("TYPE"), (4,)):
+                for col in ("DR_X", "DR_Z"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.{col}={val}"], "DR_MAIN", col)
+
     def _dranglzone_branch(self, name, path):
         if not name:
             return
@@ -2043,6 +2119,81 @@ class DescType26Mixin:
             for lindiv in self._fetch_descriptor_type26(descname):
                 rec_path = new_path + [f"LINDIV={lindiv}"]
                 self._resolve_then_type26(lindiv, rec_path, handler)
+            self._active.discard(state_key)
+        if pv.is_raw:
+            handler(value, path)
+
+
+class DescType29Mixin:
+    """Flow-local helper: used ONLY for the DRAWERSING.DRAWER step's
+    #DESCRIPTOR resolution in DRAWERSING_PURCHASE_DRAWER (DESC_TYPE=29 →
+    DEFAULT-filtered LINDIV rows, otherwise stop). Does NOT override
+    _classify, so every other #DESCRIPTOR resolution in this flow still
+    uses the normal shared engine behavior unchanged."""
+
+    @staticmethod
+    def _fetch_descriptor_type29(name):
+        desc_rows = query(
+            "SELECT DESC_TYPE FROM dbo.[DESCRIPTOR] "
+            "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        if not desc_rows:
+            return []
+
+        try:
+            is_type_29 = int(desc_rows[0].get("DESC_TYPE")) == 29
+        except (TypeError, ValueError):
+            is_type_29 = False
+
+        if not is_type_29:
+            return []
+
+        rows = query(
+            "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
+            "WHERE dv.NAME = ? AND dv.COMMENT = 'DEFAULT' "
+            "ORDER BY dv.NODENUM, dv.CONDITIONID",
+            (name,)
+        )
+
+        out = []
+        for r in rows:
+            v = normalize(r["LINDIV"])
+            if v:
+                out.append(v)
+        return out
+
+    def _resolve_then_type29(self, value, path, handler):
+        from core.traversal_base import _fetch_imos
+        pv = parse(value)
+        if pv is None:
+            return
+        for varname in pv.variables:
+            state_key = (STATE_IMOS, varname)
+            if state_key in self._active:
+                self.result.cycles.append(f"CYCLE: {' → '.join(path)} → $IMOS({varname})")
+                continue
+            self._active.add(state_key)
+            wert_values = _fetch_imos(varname)
+            if wert_values is None:
+                self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_type29(wert, rec_path, handler)
+            self._active.discard(state_key)
+        for descname in pv.descriptors:
+            state_key = (STATE_DESCRIPTOR, descname)
+            if state_key in self._active:
+                self.result.cycles.append(f"CYCLE: {' → '.join(path)} → #DESCRIPTOR({descname})")
+                continue
+            self._active.add(state_key)
+            new_path = path + [f"#DESCRIPTOR({descname})"]
+            for lindiv in self._fetch_descriptor_type29(descname):
+                rec_path = new_path + [f"LINDIV={lindiv}"]
+                self._resolve_then_type29(lindiv, rec_path, handler)
             self._active.discard(state_key)
         if pv.is_raw:
             handler(value, path)
