@@ -209,6 +209,17 @@ class BaseTraversal:
             self._active.discard(state_key)
 
         if pv.is_raw:
+            self._classify_raw_dispatch(value, state, path, source_table, source_column)
+
+    def _classify_raw_dispatch(
+        self,
+        value: str,
+        state: str,
+        path: list[str],
+        source_table: str,
+        source_column: str,
+    ) -> None:
+        if True:
             if state == STATE_CONNECTIONS:
                 self._enter_connections(value, path, source_table, source_column)
             elif state == STATE_TERMINAL:

@@ -12,10 +12,11 @@ from core.branches import (
     STATE_CONNECTIONS, STATE_CONNDESC, STATE_CONNEXTRA, STATE_CONNSELATTR,
     STATE_CONNGROUPS, STATE_PROFIL, STATE_RENDER,
     STATE_CONTELEM, STATE_NUT_ERB, STATE_EXTRUPAR, STATE_EXTRUCON,
-    STATE_IDENT, STATE_IMOS, STATE_MAT, STATE_SURF, STATE_TERMINAL,
+    STATE_IDENT, STATE_IMOS, STATE_DESCRIPTOR, STATE_MAT, STATE_SURF, STATE_TERMINAL,
     STATE_CONNECTIONSATTR, STATE_BLENDE, STATE_CSIDE, STATE_CABBACK,
     STATE_DOOR, STATE_DOORSING, STATE_GRIFF, STATE_PULLHEIGHT, STATE_DOOR_FLAP,
 )
+#from core.branches import STATE_DESCRIPTOR as STATE_DESCRIPTOR  # noqa: F401 (kept for _resolve_then_type26)
 from core.parser import parse
 
 
@@ -1820,6 +1821,81 @@ class AnglprimMixin:
                     if val:
                         self._classify(val, STATE_TERMINAL, path + [f"PULLHEIGHT.PHVALUE={val}"],
                                        "PULLHEIGHT", "PHVALUE")
+
+
+class DescType26Mixin:
+    """Flow-local helper: used ONLY for the DRAWERSING.DRAWER step's
+    #DESCRIPTOR resolution (DESC_TYPE=26 → DEFAULT-filtered LINDIV rows,
+    otherwise stop). Does NOT override _classify, so every other
+    #DESCRIPTOR resolution in these 3 flows (CONNECTIONS.LINDIV, etc.)
+    still uses the normal shared engine behavior unchanged."""
+
+    @staticmethod
+    def _fetch_descriptor_type26(name):
+        desc_rows = query(
+            "SELECT DESC_TYPE FROM dbo.[DESCRIPTOR] "
+            "WHERE NAME = ? AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        if not desc_rows:
+            return []
+
+        try:
+            is_type_26 = int(desc_rows[0].get("DESC_TYPE")) == 26
+        except (TypeError, ValueError):
+            is_type_26 = False
+
+        if not is_type_26:
+            return []
+
+        rows = query(
+            "SELECT dv.LINDIV FROM dbo.[DESCRIPTORVALUES] dv "
+            "WHERE dv.NAME = ? AND dv.COMMENT = 'DEFAULT' "
+            "ORDER BY dv.NODENUM, dv.CONDITIONID",
+            (name,)
+        )
+
+        out = []
+        for r in rows:
+            v = normalize(r["LINDIV"])
+            if v:
+                out.append(v)
+        return out
+
+    def _resolve_then_type26(self, value, path, handler):
+        from core.traversal_base import _fetch_imos
+        pv = parse(value)
+        if pv is None:
+            return
+        for varname in pv.variables:
+            state_key = (STATE_IMOS, varname)
+            if state_key in self._active:
+                self.result.cycles.append(f"CYCLE: {' → '.join(path)} → $IMOS({varname})")
+                continue
+            self._active.add(state_key)
+            wert_values = _fetch_imos(varname)
+            if wert_values is None:
+                self._record(varname, "[NOT IN IMOS]", path + [f"$IMOS({varname})"], "IMOS", "WERT", "UNRESOLVED")
+            else:
+                for wert in wert_values:
+                    rec_path = path + [f"$IMOS({varname})", f"WERT={wert}"]
+                    self._record(varname, wert, rec_path, "IMOS", "WERT", "IMOS")
+                    if wert != "[BLANK]":
+                        self._resolve_then_type26(wert, rec_path, handler)
+            self._active.discard(state_key)
+        for descname in pv.descriptors:
+            state_key = (STATE_DESCRIPTOR, descname)
+            if state_key in self._active:
+                self.result.cycles.append(f"CYCLE: {' → '.join(path)} → #DESCRIPTOR({descname})")
+                continue
+            self._active.add(state_key)
+            new_path = path + [f"#DESCRIPTOR({descname})"]
+            for lindiv in self._fetch_descriptor_type26(descname):
+                rec_path = new_path + [f"LINDIV={lindiv}"]
+                self._resolve_then_type26(lindiv, rec_path, handler)
+            self._active.discard(state_key)
+        if pv.is_raw:
+            handler(value, path)
 
 
 class ArticleCategoryMixin:
