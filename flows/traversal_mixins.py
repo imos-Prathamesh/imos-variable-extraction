@@ -628,6 +628,156 @@ class AnglprimMixin:
                 self._resolve_then(frontpartdef, path + [f"DRAWERSING.FRONTPARTDEF={frontpartdef}"],
                                     self._kms_branch)
 
+    def _dr_front_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT SET_FRONT, THKSTR, PART_INFO, PART_DEF, "
+            "CONNSIT_PULL, CONNSIT_PULL2, CONNSIT_PULL3 "
+            "FROM dbo.[DR_FRONT] WHERE NAME = ? "
+            "AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        for row in rows:
+            self._dr_main_branch(name, path)
+            self._dranglconi_branch(name, path)
+            self._dranglzone_branch(name, path)
+
+            if not self._int_in(row.get("SET_FRONT"), (1,)):
+                continue
+
+            thkstr = normalize(row.get("THKSTR"))
+            if thkstr:
+                self._classify(thkstr, STATE_TERMINAL, path + [f"DR_FRONT.THKSTR={thkstr}"],
+                               "DR_FRONT", "THKSTR")
+
+            part_info = normalize(row.get("PART_INFO"))
+            if part_info:
+                self._generic_branch(part_info, STATE_IDENT, path + [f"DR_FRONT.PART_INFO={part_info}"])
+
+            part_def = normalize(row.get("PART_DEF"))
+            if part_def:
+                self._resolve_then(part_def, path + [f"DR_FRONT.PART_DEF={part_def}"], self._kms_branch)
+
+            for col in ("CONNSIT_PULL", "CONNSIT_PULL2", "CONNSIT_PULL3"):
+                val = normalize(row.get(col))
+                if val:
+                    self._resolve_then(val, path + [f"DR_FRONT.{col}={val}"], self._griff_branch)
+
+    def _dr_main_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT TYPE, DR_X, DR_Z, FIXHEIGHT, BOXHEIGHT, FIXDEPTH, BOXDEPTH, "
+            "PURCHBOX, PURCHBOXINFO, DRDS_BEFR, DRDS_TEFR, "
+            "IGNORE_DRDSTOSH, DRDS_TOSH, IGNORE_DRDSBOSH, DRDS_BOSH, "
+            "DRMANINFO, CONNSIT_SLIDE "
+            "FROM dbo.[DR_MAIN] WHERE NAME = ?",
+            (name,)
+        )
+        for row in rows:
+            for col in ("DRDS_BEFR", "DRDS_TEFR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.{col}={val}"], "DR_MAIN", col)
+
+            if self._int_in(row.get("IGNORE_DRDSTOSH"), (0,)):
+                val = normalize(row.get("DRDS_TOSH"))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.DRDS_TOSH={val}"], "DR_MAIN", "DRDS_TOSH")
+
+            if self._int_in(row.get("IGNORE_DRDSBOSH"), (0,)):
+                val = normalize(row.get("DRDS_BOSH"))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.DRDS_BOSH={val}"], "DR_MAIN", "DRDS_BOSH")
+
+            drmaninfo = normalize(row.get("DRMANINFO"))
+            if drmaninfo:
+                self._generic_branch(drmaninfo, STATE_IDENT, path + [f"DR_MAIN.DRMANINFO={drmaninfo}"])
+
+            connsit_slide = normalize(row.get("CONNSIT_SLIDE"))
+            if connsit_slide:
+                self._classify(connsit_slide, STATE_CONNECTIONS, path + [f"DR_MAIN.CONNSIT_SLIDE={connsit_slide}"],
+                               "DR_MAIN", "CONNSIT_SLIDE")
+
+            if self._int_in(row.get("TYPE"), (5,)):
+                for col in ("DR_X", "DR_Z"):
+                    val = normalize(row.get(col))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.{col}={val}"], "DR_MAIN", col)
+
+                if self._int_in(row.get("FIXHEIGHT"), (1,)):
+                    val = normalize(row.get("BOXHEIGHT"))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.BOXHEIGHT={val}"],
+                                       "DR_MAIN", "BOXHEIGHT")
+
+                if self._int_in(row.get("FIXDEPTH"), (1,)):
+                    val = normalize(row.get("BOXDEPTH"))
+                    if val:
+                        self._classify(val, STATE_TERMINAL, path + [f"DR_MAIN.BOXDEPTH={val}"],
+                                       "DR_MAIN", "BOXDEPTH")
+
+                if self._int_in(row.get("PURCHBOX"), (1,)):
+                    purchboxinfo = normalize(row.get("PURCHBOXINFO"))
+                    if purchboxinfo:
+                        self._generic_branch(purchboxinfo, STATE_IDENT,
+                                              path + [f"DR_MAIN.PURCHBOXINFO={purchboxinfo}"])
+
+    def _dranglconi_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT CONISITU FROM dbo.[dranglconi] WHERE NAME = ? "
+            "AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        for row in rows:
+            conisitu = normalize(row.get("CONISITU"))
+            if conisitu:
+                self._classify(conisitu, STATE_CONNECTIONS, path + [f"dranglconi.CONISITU={conisitu}"],
+                               "dranglconi", "CONISITU")
+
+    def _dranglzone_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT MANINFOBS, BOTSHELF FROM dbo.[dranglzone] WHERE NAME = ? "
+            "AND NULLIF(LTRIM(RTRIM(INORDER)), N'') IS NULL",
+            (name,)
+        )
+        for row in rows:
+            maninfobs = normalize(row.get("MANINFOBS"))
+            if maninfobs:
+                self._generic_branch(maninfobs, STATE_IDENT, path + [f"dranglzone.MANINFOBS={maninfobs}"])
+
+            botshelf = normalize(row.get("BOTSHELF"))
+            if botshelf:
+                self._resolve_then(botshelf, path + [f"dranglzone.BOTSHELF={botshelf}"], self._kms_branch)
+
+    def _dranglelem_branch(self, name, path):
+        if not name:
+            return
+        rows = query(
+            "SELECT CPNAME, MANINFO, TOPOFFFOR, BOTOFFFOR, BSHOFFFOR, "
+            "ENDOFFFOR, STAOFFFOR, INSETFOR FROM dbo.[dranglelem] WHERE NAME = ?",
+            (name,)
+        )
+        for row in rows:
+            cpname = normalize(row.get("CPNAME"))
+            if cpname:
+                self._classify(cpname, STATE_CSIDE, path + [f"dranglelem.CPNAME={cpname}"],
+                               "dranglelem", "CPNAME")
+
+            maninfo = normalize(row.get("MANINFO"))
+            if maninfo:
+                self._generic_branch(maninfo, STATE_IDENT, path + [f"dranglelem.MANINFO={maninfo}"])
+
+            for col in ("TOPOFFFOR", "BOTOFFFOR", "BSHOFFFOR", "ENDOFFFOR", "STAOFFFOR", "INSETFOR"):
+                val = normalize(row.get(col))
+                if val:
+                    self._classify(val, STATE_TERMINAL, path + [f"dranglelem.{col}={val}"], "dranglelem", col)
+
     def _design_branch(self, name, path):
         _gated_cols = {
             "SFRONTDIST", "SBACKDIST", "SSOCKETHGT",
